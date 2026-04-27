@@ -1,13 +1,1 @@
-{
-  "type": "service_account",
-  "project_id": "techlance-28e1b",
-  "private_key_id": "66c6ba4e93294199afe7ad03bb452baf0c33f424",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCnc02rmDiZJx8M\nkuRYSGNa80QlHP+VPFXlSz3x3Nc2+tBn/xptCkvZuxEcHr++Lf89nJaQF3RUpjfp\nNQvo27hBBX2++9ccUQkmY6v0xxV4MNlSmMnQI+hSQl7HnlIpZP6zqb1d8YP1BOhF\n1iSwZV8StHE9fUZOyD4RKrIHBQ9wlnAzn/BWrT9piyYy95OIywlDSaR7vEgTdJai\nJtbGYsWQ5HqRSnghwieGDmPG/eZIyg4nB44iNBr4Qfkf4KM2j67Ybf6Ome2JAe0z\n+jgXoz+XwlJcDfMHBJzGIweQWUPIVU3gf3MGEh6Gd8PGNT1nl8R980LpwqFEt29r\nzDeW6wDHAgMBAAECggEAPVQyt01KNXWpno5SSa9BjHcal0k2pq7xesiDCIls3Xsh\nR2WchSFHRJiKHLV6Xqo0GJm4X0/n0HUMd0JxeTi4FEBxnLhaQcnAQyowObeMuneR\nsPm6uJveI/qhAhWPXA/cZWseq0CgpuXEOIfE6kJGfvBNpUqzrHkUmm77wyxsSjyH\naq127cSwf4XBamHXmqN/1ajefkCxRGpSqzBbBNtoCwNMUE/yjG/KfDBIlr+fE/K+\nnymB3c9OE6NdKE2NqFe/EGy6ZoyXWlYQ1cbtCf5oGEWuKzn41wD8FzdTEBa2Ae9V\nJnftGOJx/z7X238q2pLcxR5767NHhkDOrC4ruDnvOQKBgQDTpM+vtWHrMM/gNJTn\nRo81KAOMMKQz2sCZiLumxk/DwPAvy+BQ6GSRVr2b53iQbKgL73kvXTxjLpeFBque\nc6tXOl/EA4IFTmVcNzaJ8NwO/cBBZPp1tAPem7jncwG0o8wXAl+xMH3RV4yTxwl4\nbUwBvxry7b5EM1CnuLxnwPE6hQKBgQDKi2maUrHfkpWSdnE967RqmnYIsEuhMdmC\nJ4+IYbM+flxfH/BxIXi7E5EbErOXwUISv9CnqeA5MNvg/AItaHIUh9eHLnRSxAeq\ncnrvGq3IuYQPsmwAHQyBdNqpvxAZsyjtQfYf1HQi2F8IgpQKaWvLtF5wcp/EBoI2\nTJHQC3992wKBgGyOOZTHdU0cQVOfxMyHrYa3WnJ6tI6AYo+dyZp2V41xlgD+ErWN\nLaA6nJCt/nIduWg90avQp9u7ly49SKPCcp0QLPSuU++C0YymKUxBha4Oy6D/OVRM\nHDv/Ja1ZmQNdjJ40sn6A/9fzjwBxc9MYRIcUza7S8OesZm9Q2xpgpZq9AoGAInzA\ne3VvMglMjIa8W3XB35DzXiFej1Dkn0PLLcas9YwggFX449p2Kyx2vaxehg1zCaw9\ng/7p3fMSzWk7ma26FwLWUP848UrNn1kk04ewZYgpE18nApHvqi9SeCq/PBEEe/mK\nRfsv1ysOa22IdYljwGiy1+S8jW0qSMKa5Vi/2ZcCgYEAzsMxD0Tzq1SlNBembLM2\nbIqnS/69h3AfxcCOgghCDknh0q05FDnCrre3OHhPewbpT0fB4oO9fTXUzFEfkgy9\nKIX5B22iFfa50P6vyM7561EMccZKThMp/6jksye+ZRe5yBelE1bcQSdxJKdqqntZ\nKTNcW/SR5ktEgO8u2y6xgoY=\n-----END PRIVATE KEY-----\n",
-  "client_email": "vertex-ai-service@techlance-28e1b.iam.gserviceaccount.com",
-  "client_id": "103545353770926294029",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/vertex-ai-service%40techlance-28e1b.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-}
+PASTE YOUR SERVICE ACCOUT KEY HERE FOR VERTEX AI
