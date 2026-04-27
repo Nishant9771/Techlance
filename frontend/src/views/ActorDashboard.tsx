@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 import { TechBackground } from '../components/TechBackground';
 import { subscribeProjectPosts, upsertLiveReaction, type LiveProjectPost } from '@/lib/liveData';
+import { semanticSearchIdeas } from '@/lib/vertexClient';
+import { useAuth } from '@/context/AuthContext';
 import { 
   stories, 
   initialPosts, 
@@ -89,6 +91,7 @@ function formatLiveProjectPost(post: LiveProjectPost) {
 
 export default function ActorDashboard() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [activeMenu, setActiveMenu] = useState('Home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -100,6 +103,8 @@ export default function ActorDashboard() {
   // New States for UI Fixes
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [semanticResults, setSemanticResults] = useState<Array<{ postId: string; title: string; category: string; score: number }>>([]);
+  const [isSemanticLoading, setIsSemanticLoading] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<'minimized' | 'expanded' | 'hidden'>('minimized');
   const [sidebarDetailModal, setSidebarDetailModal] = useState<any>(null);
   const [infoModal, setInfoModal] = useState<{isOpen: boolean, title: string, content: React.ReactNode}>({ isOpen: false, title: '', content: '' });
@@ -119,6 +124,36 @@ export default function ActorDashboard() {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSemanticResults([]);
+      setIsSemanticLoading(false);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setIsSemanticLoading(true);
+      semanticSearchIdeas({ query, k: 5, minScore: 0.25 })
+        .then((data) => {
+          if (Array.isArray(data?.results)) {
+            setSemanticResults(data.results);
+            return;
+          }
+          setSemanticResults([]);
+        })
+        .catch((error) => {
+          console.warn('Semantic search failed.', error);
+          setSemanticResults([]);
+        })
+        .finally(() => {
+          setIsSemanticLoading(false);
+        });
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   // Interactive States
   const [savedPosts, setSavedPosts] = useState<Array<string | number>>([]);
@@ -176,6 +211,15 @@ export default function ActorDashboard() {
     { name: 'Help / Support', icon: MessageSquare, action: 'modal', content: <HelpContent /> },
   ];
 
+  const sidebarName =
+    profile?.displayName?.trim() ||
+    user?.displayName?.trim() ||
+    (user?.email ? user.email.split('@')[0] : '') ||
+    'Your Profile';
+  const sidebarRole = profile?.role ? `${profile.role.charAt(0).toUpperCase()}${profile.role.slice(1)}` : 'Actor';
+  const sidebarAvatarSeed = encodeURIComponent(profile?.uid || user?.uid || user?.email || 'techlance-actor');
+  const sidebarAvatar = user?.photoURL || `https://picsum.photos/seed/${sidebarAvatarSeed}/100/100`;
+
   return (
     <div className="h-screen w-full flex bg-slate-950 text-white overflow-hidden font-sans selection:bg-blue-500/30 relative">
       {/* Animated Background */}
@@ -193,12 +237,12 @@ export default function ActorDashboard() {
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 p-[2px] shadow-[0_0_15px_rgba(59,130,246,0.3)] group-hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] transition-shadow duration-300">
             <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
-              <img src="https://picsum.photos/seed/johndoe/100/100" alt="Profile" className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
+              <img src={sidebarAvatar} alt={sidebarName} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
             </div>
           </div>
           <div className="relative z-10">
-            <h2 className="font-semibold text-sm text-white group-hover:text-blue-200 transition-colors">John Doe</h2>
-            <p className="text-xs text-blue-400/80 font-medium tracking-wide">Software Engineer</p>
+            <h2 className="font-semibold text-sm text-white group-hover:text-blue-200 transition-colors">{sidebarName}</h2>
+            <p className="text-xs text-blue-400/80 font-medium tracking-wide">{sidebarRole}</p>
           </div>
         </div>
 
@@ -288,13 +332,31 @@ export default function ActorDashboard() {
                         <div><p className="text-sm text-white">Alice Engineer</p><p className="text-xs text-slate-500">Hardware</p></div>
                       </div>
                       <div className="px-3 py-2 mt-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Projects</div>
-                      <div 
-                        className="px-3 py-2 hover:bg-white/5 rounded-xl cursor-pointer"
-                        onClick={() => setOfferModal({ isOpen: true, postId: 1 })}
-                      >
-                        <p className="text-sm text-white">Smart Hub Prototype</p>
-                        <p className="text-xs text-slate-500">IoT / Hardware</p>
-                      </div>
+                      {isSemanticLoading ? (
+                        <div className="px-3 py-2 text-xs text-slate-400">Searching by meaning...</div>
+                      ) : semanticResults.length > 0 ? (
+                        semanticResults.map((result) => (
+                          <div
+                            key={result.postId}
+                            className="px-3 py-2 hover:bg-white/5 rounded-xl cursor-pointer"
+                            onClick={() => {
+                              setIsSearchOpen(false);
+                              navigate(`/post/${encodeURIComponent(result.postId)}`);
+                            }}
+                          >
+                            <p className="text-sm text-white">{result.title}</p>
+                            <p className="text-xs text-slate-500">{result.category} • Semantic Match {result.score}%</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div
+                          className="px-3 py-2 hover:bg-white/5 rounded-xl cursor-pointer"
+                          onClick={() => setOfferModal({ isOpen: true, postId: 1 })}
+                        >
+                          <p className="text-sm text-white">Smart Hub Prototype</p>
+                          <p className="text-xs text-slate-500">IoT / Hardware</p>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}

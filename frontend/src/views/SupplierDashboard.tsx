@@ -179,6 +179,15 @@ export default function SupplierDashboard() {
     { name: 'Help / Support', icon: MessageSquare, action: 'modal', content: <HelpContent /> },
   ];
 
+  const sidebarName =
+    profile?.displayName?.trim() ||
+    user?.displayName?.trim() ||
+    (user?.email ? user.email.split('@')[0] : '') ||
+    'Your Profile';
+  const sidebarRole = profile?.role ? `${profile.role.charAt(0).toUpperCase()}${profile.role.slice(1)}` : 'Supplier';
+  const sidebarAvatarSeed = encodeURIComponent(profile?.uid || user?.uid || user?.email || 'techlance-supplier');
+  const sidebarAvatar = user?.photoURL || `https://picsum.photos/seed/${sidebarAvatarSeed}/150/150`;
+
   const toggleSidebarModal = (type: 'actors' | 'projects' | 'suppliers') => {
     // Implement toggle sidebar
   };
@@ -204,12 +213,12 @@ export default function SupplierDashboard() {
         >
           <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-700 group-hover:border-blue-400 transition-colors shadow-lg">
-            <img src="https://picsum.photos/seed/supplier/150/150" alt="Supplier" className="w-full h-full object-cover" />
+            <img src={sidebarAvatar} alt={sidebarName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
           <div className="flex-1 min-w-0 z-10">
-            <h3 className="font-bold text-white truncate text-base">Acme Supplies</h3>
+            <h3 className="font-bold text-white truncate text-base">{sidebarName}</h3>
             <p className="text-sm text-blue-400 font-medium truncate flex items-center gap-1">
-              Supplier <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-1 shadow-[0_0_5px_#22c55e]"></span>
+              {sidebarRole} <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-1 shadow-[0_0_5px_#22c55e]"></span>
             </p>
           </div>
         </div>

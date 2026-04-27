@@ -17,6 +17,8 @@ import {
   Users,
   ShoppingBag,
   Cpu,
+  BrainCircuit,
+  Shield,
   Clock,
   DollarSign,
   ChevronRight,
@@ -36,6 +38,7 @@ import {
 } from 'lucide-react';
 import { TechBackground } from '../components/TechBackground';
 import { subscribeProjectPosts, upsertLiveReaction, type LiveProjectPost } from '@/lib/liveData';
+import { useAuth } from '@/context/AuthContext';
 import { 
   stories, 
   initialPosts, 
@@ -87,6 +90,7 @@ function formatLiveProjectPost(post: LiveProjectPost) {
 
 export default function UserDashboard() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [activeMenu, setActiveMenu] = useState('Home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -156,6 +160,8 @@ export default function UserDashboard() {
   const menuItems = [
     { name: 'Home', icon: HomeIcon, path: '/home' },
     { name: 'Projects', icon: FolderKanban, path: '/projects' },
+    { name: 'Intelligence', icon: BrainCircuit, path: '/project-intelligence' },
+    { name: 'Trust Layer', icon: Shield, path: '/blockchain-trust' },
     { name: 'Offers', icon: Briefcase, path: '/offers' },
     { name: 'Shop', icon: ShoppingBag, path: '/shop' },
     { name: 'Messages', icon: MessageSquare, path: '/messages' },
@@ -165,6 +171,15 @@ export default function UserDashboard() {
     { name: 'Privacy Policy', icon: Bookmark, action: 'modal', content: <PrivacyContent /> },
     { name: 'Help / Support', icon: MessageSquare, action: 'modal', content: <HelpContent /> },
   ];
+
+  const sidebarName =
+    profile?.displayName?.trim() ||
+    user?.displayName?.trim() ||
+    (user?.email ? user.email.split('@')[0] : '') ||
+    'Your Profile';
+  const sidebarRole = profile?.role ? `${profile.role.charAt(0).toUpperCase()}${profile.role.slice(1)}` : 'User';
+  const sidebarAvatarSeed = encodeURIComponent(profile?.uid || user?.uid || user?.email || 'techlance-user');
+  const sidebarAvatar = user?.photoURL || `https://picsum.photos/seed/${sidebarAvatarSeed}/100/100`;
 
   return (
     <div className="h-screen w-full flex bg-slate-950 text-white overflow-hidden font-sans selection:bg-blue-500/30 relative">
@@ -183,12 +198,12 @@ export default function UserDashboard() {
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 p-[2px] shadow-[0_0_15px_rgba(59,130,246,0.3)] group-hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] transition-shadow duration-300">
             <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
-              <img src="https://picsum.photos/seed/johndoe/100/100" alt="Profile" className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
+              <img src={sidebarAvatar} alt={sidebarName} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
             </div>
           </div>
           <div className="relative z-10">
-            <h2 className="font-semibold text-sm text-white group-hover:text-blue-200 transition-colors">John Doe</h2>
-            <p className="text-xs text-blue-400/80 font-medium tracking-wide">Software Engineer</p>
+            <h2 className="font-semibold text-sm text-white group-hover:text-blue-200 transition-colors">{sidebarName}</h2>
+            <p className="text-xs text-blue-400/80 font-medium tracking-wide">{sidebarRole}</p>
           </div>
         </div>
 
@@ -299,6 +314,18 @@ export default function UserDashboard() {
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-white/10 text-white rounded-xl text-sm font-medium transition-colors hidden sm:flex items-center gap-2"
             >
               <ShoppingBag className="w-4 h-4" /> Shop
+            </button>
+            <button 
+              onClick={() => navigate('/project-intelligence')}
+              className="px-4 py-2 bg-cyan-400/90 hover:bg-cyan-300 text-slate-950 rounded-xl text-sm font-semibold transition-all hidden sm:flex items-center gap-2"
+            >
+              <BrainCircuit className="w-4 h-4" /> Intelligence
+            </button>
+            <button 
+              onClick={() => navigate('/blockchain-trust')}
+              className="px-4 py-2 bg-emerald-400/90 hover:bg-emerald-300 text-slate-950 rounded-xl text-sm font-semibold transition-all hidden sm:flex items-center gap-2"
+            >
+              <Shield className="w-4 h-4" /> Trust
             </button>
             <button 
               onClick={() => navigate('/create-project')}
