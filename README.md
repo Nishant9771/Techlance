@@ -1,276 +1,243 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# TechLance
 
-# TechLance Next.js App
+TechLance is a role-based engineering collaboration platform with three user roles:
+- `user` (project owner)
+- `actor` (engineer/freelancer)
+- `supplier` (parts/services supplier)
 
-This project now runs on Next.js (App Router) with the frontend located in `frontend/`.
+It includes:
+- Next.js frontend (`frontend/`)
+- Express + Vertex backend (`backend/`)
+- Firebase Auth + Firestore + Storage
+- Blockchain trust utilities (Polygon Amoy)
+- AI/ML APIs for ranking, novelty, fraud checks, pricing, and project success
 
-## Vertex AI ML Engines (Now Added)
+## Current Status (Verified)
 
-This app now includes 3 ML engines powered by Vertex AI:
+As of this update:
+- Firestore backend health is passing (`firestoreRead.ok = true`, `firestoreWrite.ok = true`).
+- Storage/retrieval paths for all roles (`user`, `actor`, `supplier`) are working through backend routes.
+- Firestore security rules + indexes are deployed for this project.
+- Left sidebar profile cards in dashboards now use signed-in Firebase profile data (no hardcoded `John Doe`).
 
-1. Idea Similarity + Novelty Scoring
-2. Smart Actor Matching Engine
-3. Project Success Prediction
+## Tech Stack
 
-### What they do
+- Frontend: Next.js 15, React 19, TypeScript
+- Backend: Express, TypeScript runtime via `tsx`
+- Database: Firebase Firestore
+- Auth: Firebase Authentication
+- Files: Firebase Storage
+- AI: Google Vertex AI + local fallback logic
+- Chain: Ethers + Polygon Amoy
 
-1. Idea Similarity + Novelty
-   - When a project is created, the app generates an embedding for the idea and stores it in Firestore (`embeddings`).
-   - Novelty is computed as `1 - max_similarity` against existing projects.
-   - You can see this in the post details panel.
+## Project Structure
 
-2. Smart Actor Matching
-   - Actor profiles can be embedded and stored in Firestore (`actorEmbeddings`).
-   - The backend ranks actors for a project using embedding similarity + profile signals.
-   - If a Vertex ranking endpoint is configured, the same API forwards to your deployed ranking model.
-
-3. Project Success Prediction
-   - The backend predicts how likely a project is to complete successfully using project detail quality, budget/timeline fit, novelty, creator readiness, and actor-market fit.
-   - If a Vertex project-success endpoint is configured, the API forwards the same feature set to your deployed model.
-   - A prediction card is shown on the project details page.
-
-Backend API routes (mounted at `/api/vertex`):
-
-- `POST /embeddings`
-- `POST /embeddings/store`
-- `POST /embeddings/nearest`
-- `GET /novelty/:postId`
-- `POST /actors/embed`
-- `POST /match`
-- `POST /project-success`
-- `POST /bid-success`
-- `POST /predict`
-
-## Run Locally
-
-Prerequisites: Node.js
-
-1. Install dependencies:
-   `npm install`
-2. Create `.env.local` at the repository root and add your keys:
-   `GEMINI_API_KEY=your_key_here`
-   `NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key`
-   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com`
-   `NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id`
-   `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com`
-   `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id`
-   `NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id`
-3. Start development server:
-   `npm run dev`
-4. Open:
-   `http://localhost:3000`
-
-### Run Backend (Required for Vertex APIs)
-
-This project has a separate Express backend in `backend/`.
-
-1. Start backend:
-   `npm run dev:backend`
-2. Start frontend:
-   `npm run dev`
-
-If both run together on your machine, you can use:
-
-`npm run dev:all`
-
-Note for Windows users: if `dev:all` has shell issues, run the two commands in separate terminals.
-
-## Production Commands
-
-1. Build:
-   `npm run build`
-2. Start production server:
-   `npm run start`
-
-## Firebase Setup (Required)
-
-### 1. Create Firebase Project
-
-1. Open Firebase Console.
-2. Create a new project.
-3. Add a Web App inside the project.
-4. Copy Firebase config values into `.env.local`.
-
-### 2. Enable Firebase Authentication
-
-1. Go to Build > Authentication > Sign-in method.
-2. Enable Email/Password provider.
-3. Save changes.
-
-### Firebase Admin Credentials for Backend
-
-Backend Vertex routes use Firebase Admin and Vertex AI.
-
-1. Create a Google Cloud service account with permissions:
-   - Vertex AI User
-   - Firestore User (or Editor for quick setup)
-2. Download JSON key.
-3. Set env var before running backend:
-   - Windows PowerShell:
-     `$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"`
-4. Also run once:
-   - `gcloud auth application-default login`
-
-If you see `PERMISSION_DENIED` from `/api/vertex/*` routes, your service account is missing IAM roles.
-Grant these roles to the service account used by backend:
-
-- `Vertex AI User`
-- `Cloud Datastore User` (Firestore)
-- Optional for easier setup: `Editor` (not recommended for production)
-
-PowerShell (copy/paste) for this project:
-
-```powershell
-gcloud projects add-iam-policy-binding techlance-28e1b --member="serviceAccount:vertex-ai-service@techlance-28e1b.iam.gserviceaccount.com" --role="roles/aiplatform.user"
-gcloud projects add-iam-policy-binding techlance-28e1b --member="serviceAccount:vertex-ai-service@techlance-28e1b.iam.gserviceaccount.com" --role="roles/datastore.user"
+```txt
+.
+|- frontend/
+|  |- src/
+|  |  |- views/
+|  |  |- lib/
+|  |  |- context/
+|- backend/
+|  |- routes/
+|  |- services/
+|  |- scripts/
+|  |- firebaseAdmin.ts
+|- firestore.rules
+|- firestore.indexes.json
+|- firebase.json
+|- .firebaserc
 ```
 
-After granting roles, restart backend and run health check:
+## Environment Setup
 
-```powershell
-Invoke-RestMethod -Method Get -Uri http://localhost:3001/api/vertex/health | ConvertTo-Json -Depth 8
+### 1) Root `.env.local` (frontend + shared)
+
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+NEXT_PUBLIC_FIREBASE_APP_ID=...
+
+NEXT_PUBLIC_API_BASE=http://localhost:3001/api/vertex
+NEXT_PUBLIC_ML_API_BASE=http://localhost:3001/api
 ```
 
-Expected healthy state:
+### 2) `backend/.env` (backend)
+
+```env
+PORT=3001
+GCP_PROJECT=techlance-28e1b
+FIREBASE_PROJECT_ID=techlance-28e1b
+GOOGLE_APPLICATION_CREDENTIALS=backend/vertex-key.json
+
+VERTEX_LOCATION=us-central1
+VERTEX_EMBEDDING_MODEL=text-embedding-004
+VERTEX_RANKING_ENDPOINT_ID=
+VERTEX_BID_ENDPOINT_ID=
+VERTEX_PROJECT_SUCCESS_ENDPOINT_ID=
+VERTEX_FRAUD_ENDPOINT_ID=
+VERTEX_PROPOSAL_COPILOT_MODEL=gemini-2.0-flash-001
+
+RPC_URL=...
+PRIVATE_KEY=...
+CONTRACT_ADDRESS=...
+ESCROW_CONTRACT_ADDRESS=...
+```
+
+### 3) Service Account Key
+
+Place your Firebase/GCP service account key at:
+- `backend/vertex-key.json`
+
+Must include Firestore access role(s):
+- `roles/datastore.user` (minimum)
+- `roles/aiplatform.user` (for Vertex APIs)
+
+## Install and Run
+
+```bash
+npm install
+npm run dev:backend
+npm run dev
+```
+
+Open:
+- Frontend: `http://localhost:3000`
+- Backend health: `http://localhost:3001/api/vertex/health`
+
+## Firebase Deploy Commands
+
+Rules and indexes are configured in repo (`firebase.json` + `.firebaserc`):
+
+```bash
+npm run firebase:rules
+npm run firebase:indexes
+```
+
+## Firestore Data Model (Core Collections)
+
+- `users`
+- `projects`
+- `projectPosts`
+- `offers`
+- `products`
+- `applications`
+- `milestones`
+- `reviews`
+- `notifications/{uid}/items`
+- `chats/{roomId}/messages`
+- `ai_analysis`
+- `blockchain_proofs`
+- `authLogs`
+- `savedPosts`
+
+## Role Flows
+
+### User
+- Register/login
+- Create project/look-in
+- Track applications, milestones, AI analysis, and trust data
+
+### Actor
+- Register/login
+- Browse projects
+- Submit offers/applications
+- Access role-based dashboard data
+
+### Supplier
+- Register/login
+- Add products
+- Suggest components and respond to needs
+
+## Jury Demo Runbook (10-12 min)
+
+### Step 1: Start app
+- `npm run dev:backend`
+- `npm run dev`
+- Show backend health endpoint with Firestore checks passing.
+
+### Step 2: Authentication
+- Create/login one account per role (`user`, `actor`, `supplier`).
+- Show each profile in Firestore `users` collection.
+
+### Step 3: User flow
+- Create a project/look-in.
+- Show document in `projectPosts` and normalized `projects` collection.
+
+### Step 4: Actor flow
+- Actor sends application/offer.
+- Show `applications` and `projects/{id}/applications` updates.
+
+### Step 5: Supplier flow
+- Supplier adds product.
+- Show `products` collection update.
+
+### Step 6: Realtime retrieval
+- Refresh dashboards and show data rendered from Firestore (not hardcoded).
+
+### Step 7: AI + trust
+- Open project intelligence/post details.
+- Show AI analysis endpoint output and stored records where applicable.
+
+## Sidebar Profile Sync Fix
+
+Dashboard sidebars now render signed-in profile values:
+- Name from Firebase Auth / Firestore profile
+- Role from Firestore profile role
+- Avatar from Firebase photo URL or deterministic fallback
+
+Updated files:
+- `frontend/src/views/UserDashboard.tsx`
+- `frontend/src/views/ActorDashboard.tsx`
+- `frontend/src/views/SupplierDashboard.tsx`
+
+## Useful Health Checks
+
+```bash
+# Backend AI + Firestore health
+curl http://localhost:3001/api/vertex/health
+```
+
+Expected:
 - `checks.vertexEmbeddings.ok = true`
 - `checks.firestoreRead.ok = true`
 - `checks.firestoreWrite.ok = true`
 
-### 3. Enable Firestore Database
+## Troubleshooting
 
-1. Go to Build > Firestore Database.
-2. Create database in production mode.
-3. Choose your region.
+### Firestore not writing
+- Verify backend health endpoint.
+- Verify `GOOGLE_APPLICATION_CREDENTIALS` path.
+- Ensure Firestore rules deployed.
+- Ensure user is authenticated for frontend direct writes.
 
-### 4. Enable Firebase Storage
+### Rules error in frontend writes
+- Run `npm run firebase:rules` again.
+- Check collection path matches rules.
 
-1. Go to Build > Storage.
-2. Create a storage bucket.
-3. Use rules that only allow each signed-in user to access their own upload folder.
+### Missing indexes
+- Run `npm run firebase:indexes`.
 
-Starter Storage rules:
+## Update GitHub Repo (Beginner Friendly)
 
-```txt
-rules_version = '2';
-service firebase.storage {
-   match /b/{bucket}/o {
-      match /users/{userId}/{allPaths=**} {
-         allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-   }
-}
+Run from project root:
+
+```bash
+git status
+git add frontend/src/views/UserDashboard.tsx frontend/src/views/ActorDashboard.tsx frontend/src/views/SupplierDashboard.tsx backend/firebaseAdmin.ts backend/routes/blockchain.js firestore.rules firebase.json .firebaserc README.md
+git commit -m "Fix Firebase data flow, profile sidebar sync, and improve README"
+git remote -v
+# if remote missing:
+# git remote add origin https://github.com/<your-username>/techlance.git
+git push origin main
 ```
 
-### 5. Add Firestore Security Rules (Starter)
+If your branch is not `main`, replace with your current branch name.
 
-Use these rules first, then tighten based on your app needs:
+## License
 
-```txt
-rules_version = '2';
-service cloud.firestore {
-   match /databases/{database}/documents {
-      match /users/{userId} {
-         allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /authLogs/{logId} {
-         allow create: if request.auth != null;
-         allow read: if false;
-         allow update, delete: if false;
-      }
-
-      match /projectPosts/{postId} {
-         allow read: if request.auth != null;
-         allow create: if request.auth != null && request.resource.data.createdBy == request.auth.uid;
-         allow update, delete: if request.auth != null && resource.data.createdBy == request.auth.uid;
-      }
-
-      match /offers/{offerId} {
-         allow read, create: if request.auth != null;
-         allow update: if request.auth != null;
-         allow delete: if false;
-      }
-
-      match /products/{productId} {
-         allow read: if request.auth != null;
-         allow create: if request.auth != null && request.resource.data.supplierId == request.auth.uid;
-         allow update, delete: if request.auth != null && resource.data.supplierId == request.auth.uid;
-      }
-
-      match /savedPosts/{savedPostId} {
-         allow read, write: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      }
-   }
-}
-```
-
-## What Is Already Wired In Code
-
-1. Firebase Auth email/password sign-in and sign-up.
-2. User profile document upsert in Firestore collection `users`.
-3. Login/register/logout/onboarding event logging in Firestore collection `authLogs`.
-4. Route-level auth guard in app router entry.
-5. Sign out now uses Firebase signOut.
-6. Registration file inputs upload to Firebase Storage and save file URLs/metadata on the user profile.
-7. Live project posts, offers, and supplier products are stored in Firestore.
-8. Vertex embeddings are created/stored for projects and queried for novelty.
-9. Actor embedding sync and actor ranking API are available.
-10. Project success prediction is available through `/api/vertex/project-success` and the post details sidebar.
-
-## Beginner Step-by-Step (Do This)
-
-1. Install dependencies:
-   `npm install`
-2. Fill `.env.local` with Firebase + Vertex vars.
-   - `VERTEX_EMBEDDING_MODEL=text-embedding-004`
-   - Optional endpoint vars:
-     - `VERTEX_RANKING_ENDPOINT_ID=YOUR_ENDPOINT_ID`
-     - `VERTEX_BID_ENDPOINT_ID=YOUR_ENDPOINT_ID`
-     - `VERTEX_PROJECT_SUCCESS_ENDPOINT_ID=YOUR_ENDPOINT_ID`
-3. Set `GOOGLE_APPLICATION_CREDENTIALS` to your service account key.
-4. Start backend: `npm run dev:backend`
-5. Start frontend: `npm run dev`
-6. Create a project from Create Look-In page.
-7. Open that post detail page. You should see:
-   - Project success prediction
-   - Novelty score
-   - Smart actor ranking panel
-8. If you have actors, set role to actor and log in once to trigger actor embedding sync.
-
-## Train + Deploy Ranking Model on Vertex AI
-
-This repo includes helper scripts:
-
-- Export dataset: `npm run ml:export-ranking-data`
-- Full guide: `scripts/train-ranking-model.md`
-
-Flow:
-
-1. Export `ranking-dataset.csv` from Firestore offers + embeddings.
-2. Upload to GCS.
-3. Train a tabular model in Vertex AI.
-4. Deploy to endpoint.
-5. Put endpoint ID in `.env.local`:
-   `VERTEX_RANKING_ENDPOINT_ID=YOUR_ENDPOINT_ID`
-
-Then `/api/vertex/match` and `/api/vertex/predict` can route inference to that endpoint.
-
-## Train + Deploy Project Success Model on Vertex AI
-
-This repo also includes project-success training helpers:
-
-- Export dataset: `npm run ml:export-project-success-data`
-- Full guide: `scripts/train-project-success-model.md`
-
-Flow:
-
-1. Export `project-success-dataset.csv` from Firestore posts + embeddings.
-2. Upload to GCS.
-3. Train a tabular classification model in Vertex AI.
-4. Deploy to endpoint.
-5. Put endpoint ID in `.env.local`:
-   `VERTEX_PROJECT_SUCCESS_ENDPOINT_ID=YOUR_ENDPOINT_ID`
-
-Then `/api/vertex/project-success` can route inference to that endpoint.
+MIT

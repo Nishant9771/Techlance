@@ -1,0 +1,198 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function currentRole() {
+      return signedIn() && userDoc(request.auth.uid).data.role is string
+        ? userDoc(request.auth.uid).data.role
+        : 'user';
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isProjectOwner(projectId) {
+      return signedIn() && get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid;
+    }
+
+    function isProjectParticipant(projectId) {
+      return signedIn() && (
+        isProjectOwner(projectId) ||
+        currentRole() == 'actor' ||
+        currentRole() == 'supplier'
+      );
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if isSelf(uid);
+      allow update: if isSelf(uid);
+      allow delete: if false;
+
+      match /projectRefs/{projectId} {
+        allow read, write: if isSelf(uid);
+      }
+    }
+
+    match /projects/{projectId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.ownerId == request.auth.uid ||
+        currentRole() == 'actor' ||
+        currentRole() == 'supplier'
+      );
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      match /applications/{applicationId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && (
+          request.resource.data.actorId == request.auth.uid ||
+          request.resource.data.supplierId == request.auth.uid
+        );
+        allow update: if signedIn() && (
+          isProjectOwner(projectId) ||
+          resource.data.actorId == request.auth.uid ||
+          resource.data.supplierId == request.auth.uid
+        );
+        allow delete: if signedIn() && isProjectOwner(projectId);
+      }
+
+      match /milestones/{milestoneId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn() && isProjectOwner(projectId);
+        allow delete: if false;
+      }
+
+      match /documents/{docId} {
+        allow read: if signedIn() && isProjectParticipant(projectId);
+        allow create: if signedIn() && isProjectParticipant(projectId);
+        allow update, delete: if signedIn() && isProjectOwner(projectId);
+      }
+    }
+
+    match /ai_analysis/{projectId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && isProjectOwner(projectId);
+      allow delete: if false;
+    }
+
+    match /embeddings/{embeddingId} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+
+    match /actorEmbeddings/{actorId} {
+      allow read: if signedIn();
+      allow write: if signedIn() && (request.auth.uid == actorId || currentRole() == 'user');
+    }
+
+    match /projectPosts/{postId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.createdBy == request.auth.uid;
+    }
+
+    match /offers/{offerId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.senderId == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.contextOwnerId == request.auth.uid
+      );
+      allow delete: if signedIn() && resource.data.senderId == request.auth.uid;
+    }
+
+    match /products/{productId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.supplierId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.supplierId == request.auth.uid;
+    }
+
+    match /savedPosts/{savedId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /authLogs/{logId} {
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow read: if false;
+      allow update, delete: if false;
+    }
+
+    match /_healthchecks/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /blockchain_proofs/{projectId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && isProjectOwner(projectId);
+      allow delete: if false;
+    }
+
+    match /reputation/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && (
+        isSelf(uid) ||
+        currentRole() == 'user'
+      );
+      allow delete: if false;
+    }
+
+    match /chats/{roomId} {
+      allow read, update: if signedIn() && resource.data.participants.hasAny([request.auth.uid]);
+      allow create: if signedIn() && request.resource.data.participants.hasAny([request.auth.uid]);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if signedIn() && get(/databases/$(database)/documents/chats/$(roomId)).data.participants.hasAny([request.auth.uid]);
+        allow create: if signedIn() && request.resource.data.senderId == request.auth.uid;
+        allow update: if signedIn() && resource.data.senderId == request.auth.uid;
+        allow delete: if false;
+      }
+    }
+
+    match /notifications/{uid}/items/{itemId} {
+      allow read: if isSelf(uid);
+      allow create, update: if isSelf(uid);
+      allow delete: if false;
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.fromUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /applications/{applicationId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if false;
+    }
+
+    match /milestones/{milestoneId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
+    }
+
+    match /documents/{documentId} {
+      allow read, write: if signedIn();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
