@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from '@/lib/router';
 import { useAuth } from '@/context/AuthContext';
 import { createProjectPost } from '@/lib/liveData';
-import { saveEmbeddingForPost } from '@/lib/vertexClient';
+import { analyzeProjectML, saveEmbeddingForPost } from '@/lib/vertexClient';
+import { saveProjectAIAnalysis } from '@/services/firestore';
 import { 
   FileText, 
   AlignLeft, 
@@ -48,6 +49,17 @@ export default function CreateProject() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showInsightsModal, setShowInsightsModal] = useState(false);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState('');
+  const [createdProjectId, setCreatedProjectId] = useState('');
+  const [projectInsights, setProjectInsights] = useState<{
+    innovationScore?: number;
+    successProbability?: number;
+    fraudRisk?: number;
+    pricingEstimate?: { min?: number; recommended?: number; max?: number; currency?: string };
+    recommendedActors?: Array<{ name?: string; score?: number }>;
+  } | null>(null);
 
   const handleAddSkill = (e: React.KeyboardEvent<HTMLInputElement> | React.MouseEvent) => {
     if (('key' in e && e.key === 'Enter') || e.type === 'click') {
@@ -125,16 +137,53 @@ export default function CreateProject() {
       });
 
       setShowSuccess(true);
-      
-      setTimeout(() => {
-        navigate(`/post/${projectId}`);
-      }, 2000);
+      setCreatedProjectId(projectId);
+      setInsightsLoading(true);
+      setInsightsError('');
+
+      const analysis = await analyzeProjectML({
+        projectId,
+        title,
+        ideaTitle: title,
+        ideaText: `${basicDescription}\n${fullDetails}`,
+        description: basicDescription,
+        fullDetails,
+        category,
+        skills,
+        budget,
+        timeline,
+        teamSize: whoNeeded === 'Team' ? 4 : 2,
+        complexity: Math.min(10, Math.max(3, skills.length + (fullDetails.length > 450 ? 2 : 0))),
+        searchQuery: title,
+      });
+
+      if (!analysis?.error) {
+        void saveProjectAIAnalysis(projectId, analysis).catch((saveError) => {
+          console.warn('ML analysis generated but ai_analysis sync failed.', saveError);
+        });
+        setProjectInsights(analysis);
+        setShowInsightsModal(true);
+        setTimeout(() => {
+          navigate(`/post/${projectId}`);
+        }, 9000);
+      } else {
+        setInsightsError(String(analysis.error));
+        setTimeout(() => {
+          navigate(`/post/${projectId}`);
+        }, 2200);
+      }
+
+      setInsightsLoading(false);
+      setIsSubmitting(false);
 
     } catch (err) {
       setError('Failed to create project. Please try again.');
+      setInsightsLoading(false);
       setIsSubmitting(false);
     }
   };
+
+  const formatPercent = (value?: number) => `${Math.round((Number(value || 0) * 100))}%`;
 
   return (
     <div className="min-h-screen w-full flex bg-[#050505] font-sans selection:bg-orange-500/30 relative overflow-y-auto custom-scrollbar">
@@ -455,6 +504,87 @@ export default function CreateProject() {
           </div>
         </motion.div>
       </div>
+
+      <AnimatePresence>
+        {showInsightsModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.96 }}
+              className="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#090909] p-6 shadow-2xl"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-xl font-black text-white">ML Insights</h3>
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                  Project Intelligence Ready
+                </span>
+              </div>
+
+              {insightsLoading ? (
+                <div className="py-10 text-center text-sm text-slate-300">Analyzing project signals...</div>
+              ) : (
+                <div className="space-y-4">
+                  {insightsError ? (
+                    <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-300">
+                      Analysis fallback: {insightsError}
+                    </p>
+                  ) : null}
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-slate-400">Innovation Score</p>
+                      <p className="text-2xl font-bold text-cyan-300">{formatPercent(projectInsights?.innovationScore)}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-slate-400">Success Probability</p>
+                      <p className="text-2xl font-bold text-emerald-300">{formatPercent(projectInsights?.successProbability)}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-slate-400">Fraud Risk</p>
+                      <p className="text-2xl font-bold text-rose-300">{formatPercent(projectInsights?.fraudRisk)}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-slate-400">Pricing Estimate</p>
+                      <p className="text-lg font-bold text-orange-300">
+                        {projectInsights?.pricingEstimate?.currency || 'USD'} {projectInsights?.pricingEstimate?.min ?? 0} - {projectInsights?.pricingEstimate?.max ?? 0}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="mb-2 text-xs text-slate-400">Recommended Actors</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(projectInsights?.recommendedActors || []).slice(0, 4).map((actor, idx) => (
+                        <span key={`${actor.name || 'actor'}-${idx}`} className="rounded-md border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-xs font-semibold text-cyan-200">
+                          {actor.name || 'Actor'} ({formatPercent(actor.score)})
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => navigate('/project-intelligence')}
+                  className="flex-1 rounded-xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-900 hover:bg-cyan-300"
+                >
+                  Open Full Dashboard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/post/${createdProjectId}`)}
+                  className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-bold text-white hover:bg-white/10"
+                >
+                  Continue to Project <ArrowRight className="ml-1 inline h-4 w-4" />
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

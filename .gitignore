@@ -1,47 +1,32 @@
-<<<<<<< HEAD
+# dependencies
 node_modules/
+
+# build outputs
 build/
 dist/
 coverage/
-.DS_Store
-*.log
-.env*
+frontend/.next/
+frontend/out/
+backend/artifacts/
+backend/cache/
+
+# environment files
+.env
+.env.*
 !.env.example
-=======
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
 
 # misc
 .DS_Store
+*.log
 *.pem
+backend/vertex-key.json
+backend/*service-account*.json
 
-# debug
+# debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.local
-.env
-
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
->>>>>>> e91bc09263e444f37865b45f71b1f03d8d533939

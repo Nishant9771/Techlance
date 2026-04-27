@@ -4,6 +4,7 @@ import { useNavigate } from '@/lib/router';
 import { useRole } from '../context/RoleContext';
 import { useAuth } from '@/context/AuthContext';
 import { setOfferStatus, subscribeOffers, type LiveOffer } from '@/lib/liveData';
+import { detectFraud } from '@/lib/vertexClient';
 import { 
   ArrowLeft, 
   Star, 
@@ -12,9 +13,37 @@ import {
   MessageSquare, 
   CheckCircle2, 
   XCircle,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { TechBackground } from '../components/TechBackground';
+
+type OfferFraudState = {
+  loading: boolean;
+  result: any | null;
+  error?: string;
+};
+
+function fraudBandClasses(band: string) {
+  if (band === 'High') {
+    return 'bg-red-500/10 border-red-500/30 text-red-300';
+  }
+  if (band === 'Medium') {
+    return 'bg-amber-500/10 border-amber-500/30 text-amber-300';
+  }
+  return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300';
+}
+
+function flattenFraudReasons(reasons: any) {
+  if (!reasons || typeof reasons !== 'object') {
+    return [] as string[];
+  }
+
+  return (Object.values(reasons) as unknown[])
+    .flatMap((value) => (Array.isArray(value) ? value : []))
+    .filter(Boolean)
+    .map((item) => String(item));
+}
 
 // Mock Offers Data
 const initialOffers = [
@@ -79,10 +108,12 @@ export default function Offers() {
   const [offers, setOffers] = useState<any[]>([]);
   const [processingId, setProcessingId] = useState<string | number | null>(null);
   const [actionType, setActionType] = useState<'accept' | 'reject' | null>(null);
+  const [fraudByOffer, setFraudByOffer] = useState<Record<string, OfferFraudState>>({});
 
   useEffect(() => {
     if (!user) {
       setOffers([]);
+      setFraudByOffer({});
       return;
     }
 
@@ -100,6 +131,88 @@ export default function Offers() {
 
     return unsubscribe;
   }, [role, user]);
+
+  const scanOfferFraud = async (offer: any) => {
+    const key = String(offer.id);
+
+    setFraudByOffer((prev) => ({
+      ...prev,
+      [key]: {
+        loading: true,
+        result: prev[key]?.result || null,
+      },
+    }));
+
+    try {
+      const offerText = String(offer.message || '');
+      const offPlatformSignal = /(whatsapp|telegram|signal|outside platform|off-platform|@\w+\.com)/i.test(offerText) ? 2 : 0;
+      const paymentRiskSignal = /(crypto|gift card|wire transfer|advance payment|upfront)/i.test(offerText) ? 1 : 0;
+
+      const response = await detectFraud({
+        expert: {
+          displayName: offer.actorName,
+          rating: offer.rating,
+          reviewsCount: offer.reviews,
+          bio: offer.message,
+          skills: [],
+          accountAgeDays: offer.timeAgo === 'Live now' ? 30 : 180,
+        },
+        review: {
+          text: offer.message,
+          rating: offer.rating,
+          verified: role !== 'actor',
+        },
+        proposal: {
+          title: offer.actorName,
+          message: offer.message,
+          workPlan: offer.message,
+          amount: offer.proposedPrice,
+          timeline: offer.timeline,
+        },
+        behavior: {
+          offPlatformPaymentMentions: paymentRiskSignal,
+          externalContactAttempts: offPlatformSignal,
+          failedPayments: 0,
+          chargebacks: 0,
+          disputes: 0,
+          rapidBidCount24h: 0,
+        },
+      });
+
+      if (response?.error) {
+        throw new Error(String(response.error));
+      }
+
+      setFraudByOffer((prev) => ({
+        ...prev,
+        [key]: {
+          loading: false,
+          result: response,
+        },
+      }));
+    } catch (fraudError) {
+      const message = fraudError instanceof Error ? fraudError.message : 'Failed to scan fraud risk.';
+      setFraudByOffer((prev) => ({
+        ...prev,
+        [key]: {
+          loading: false,
+          result: null,
+          error: message,
+        },
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (role === 'actor') {
+      return;
+    }
+
+    const unseen = offers.filter((offer) => !fraudByOffer[String(offer.id)]);
+    unseen.slice(0, 4).forEach((offer) => {
+      void scanOfferFraud(offer);
+    });
+  }, [offers, role, fraudByOffer]);
 
   const handleAccept = async (id: string | number) => {
     setProcessingId(id);
@@ -239,7 +352,37 @@ export default function Offers() {
                       <div className="bg-slate-800/30 border border-white/5 rounded-xl p-4 text-sm text-slate-300 leading-relaxed">
                         "{offer.message}"
                       </div>
-                      <p className="text-xs text-slate-500">{offer.timeAgo}</p>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs text-slate-500">{offer.timeAgo}</p>
+                        {fraudByOffer[String(offer.id)]?.loading && (
+                          <span className="text-[11px] px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300">
+                            Scanning fraud risk...
+                          </span>
+                        )}
+                        {fraudByOffer[String(offer.id)]?.result?.band && (
+                          <span
+                            className={`text-[11px] px-2 py-1 rounded-md border ${fraudBandClasses(String(fraudByOffer[String(offer.id)]?.result?.band))}`}
+                          >
+                            {String(fraudByOffer[String(offer.id)]?.result?.band)} risk • {Math.round(Number(fraudByOffer[String(offer.id)]?.result?.overallRisk || 0) * 100)}%
+                          </span>
+                        )}
+                      </div>
+
+                      {fraudByOffer[String(offer.id)]?.result?.reasons && (
+                        <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3">
+                          <p className="text-xs font-semibold text-slate-300 mb-1.5">Fraud Signals</p>
+                          <ul className="space-y-1 text-xs text-slate-400">
+                            {flattenFraudReasons(fraudByOffer[String(offer.id)]?.result?.reasons).slice(0, 2).map((reason) => (
+                              <li key={reason}>• {reason}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {fraudByOffer[String(offer.id)]?.error && (
+                        <p className="text-xs text-red-400">{fraudByOffer[String(offer.id)]?.error}</p>
+                      )}
                     </div>
 
                     {/* Right Column: Actions */}
@@ -266,6 +409,21 @@ export default function Offers() {
                       >
                         <MessageSquare className="w-4 h-4" />
                         Chat
+                      </button>
+
+                      <button
+                        onClick={() => scanOfferFraud(offer)}
+                        disabled={processingId !== null || fraudByOffer[String(offer.id)]?.loading}
+                        className="flex-1 lg:flex-none py-2.5 px-4 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {fraudByOffer[String(offer.id)]?.loading ? (
+                          <div className="w-4 h-4 border-2 border-amber-300/30 border-t-amber-300 rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <ShieldAlert className="w-4 h-4" />
+                            Risk Scan
+                          </>
+                        )}
                       </button>
 
                       <button 

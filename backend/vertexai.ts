@@ -24,6 +24,14 @@ function getDefaultProjectSuccessEndpointId() {
   return process.env.VERTEX_PROJECT_SUCCESS_ENDPOINT_ID || '';
 }
 
+function getDefaultFraudEndpointId() {
+  return process.env.VERTEX_FRAUD_ENDPOINT_ID || '';
+}
+
+function getDefaultProposalCopilotModel() {
+  return process.env.VERTEX_PROPOSAL_COPILOT_MODEL || 'gemini-2.0-flash-001';
+}
+
 const getAccessToken = async () => {
   const auth = new GoogleAuth({scopes: ['https://www.googleapis.com/auth/cloud-platform']});
   const client = await auth.getClient();
@@ -55,7 +63,7 @@ function getActionHintForError(err: any) {
 
 function isFirestorePermissionError(err: any) {
   const msg = String(err?.message || '');
-  return /PERMISSION_DENIED|Missing or insufficient permissions|insufficient permissions/i.test(msg);
+  return /PERMISSION_DENIED|UNAUTHENTICATED|Missing or insufficient permissions|insufficient permissions|invalid authentication credentials/i.test(msg);
 }
 
 function clamp(value: number, min = 0, max = 1) {
@@ -63,9 +71,13 @@ function clamp(value: number, min = 0, max = 1) {
 }
 
 function parseMoney(value: any): number {
-  const normalized = String(value ?? '').replace(/[^0-9.]/g, '');
-  const num = Number(normalized);
-  return Number.isFinite(num) ? num : 0;
+  const matches = String(value ?? '').match(/\d+(?:\.\d+)?/g) || [];
+  if (matches.length === 0) return 0;
+  const numbers = matches.map((m) => Number(m)).filter((n) => Number.isFinite(n));
+  if (numbers.length === 0) return 0;
+  if (numbers.length === 1) return numbers[0];
+  const sum = numbers.reduce((acc, curr) => acc + curr, 0);
+  return sum / numbers.length;
 }
 
 function parseDays(value: any): number {
@@ -81,168 +93,81 @@ function successBand(probability: number) {
   return 'Low';
 }
 
-function average(values: number[]) {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+function riskBand(score: number) {
+  if (score >= 0.7) return 'High';
+  if (score >= 0.4) return 'Medium';
+  return 'Low';
+}
+
+function toNumber(value: any, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function normalizeStringArray(value: any): string[] {
   if (Array.isArray(value)) {
-    return value.map((item) => String(item ?? '').trim()).filter(Boolean);
+    return value.map((v) => String(v ?? '').trim()).filter(Boolean);
   }
   if (typeof value === 'string') {
-    return value.split(',').map((item) => item.trim()).filter(Boolean);
+    return value
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
   }
   return [];
 }
 
-function pickNestedNumber(record: any, keys: string[], fallback = 0) {
-  const containers = [record, record?.profileDetails, record?.stats, record?.profileDetails?.stats];
-  for (const container of containers) {
-    if (!container || typeof container !== 'object') continue;
-    for (const key of keys) {
-      const value = Number(container[key]);
-      if (Number.isFinite(value)) return value;
+function tokenize(text: string): string[] {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length > 1);
+}
+
+function lexicalSimilarityFromText(a: string, b: string) {
+  const aSet = new Set(tokenize(a));
+  const bSet = new Set(tokenize(b));
+  if (aSet.size === 0 || bSet.size === 0) return 0;
+  let intersection = 0;
+  for (const token of aSet) {
+    if (bSet.has(token)) intersection += 1;
+  }
+  const union = aSet.size + bSet.size - intersection;
+  return union > 0 ? intersection / union : 0;
+}
+
+function normalizeVector(vec: number[]) {
+  let magnitude = 0;
+  for (const value of vec) {
+    magnitude += value * value;
+  }
+  const denom = Math.sqrt(magnitude || 1e-12);
+  return vec.map((value) => value / denom);
+}
+
+function pseudoEmbeddingFromText(text: string, dimensions = 256) {
+  const vector = new Array(dimensions).fill(0) as number[];
+  const tokens = tokenize(text);
+  for (let tokenIdx = 0; tokenIdx < tokens.length; tokenIdx += 1) {
+    const token = tokens[tokenIdx];
+    for (let charIdx = 0; charIdx < token.length; charIdx += 1) {
+      const code = token.charCodeAt(charIdx);
+      const index = (code * 31 + tokenIdx * 17 + charIdx * 13) % dimensions;
+      const signed = (code % 2 === 0 ? 1 : -1) * ((charIdx + 1) / (token.length + 1));
+      vector[index] += signed;
     }
   }
-  return fallback;
+  return normalizeVector(vector);
 }
 
-function pickNestedText(record: any, keys: string[]) {
-  const containers = [record, record?.profileDetails, record?.stats, record?.profileDetails?.stats];
-  for (const container of containers) {
-    if (!container || typeof container !== 'object') continue;
-    for (const key of keys) {
-      const value = container[key];
-      if (typeof value === 'string' && value.trim()) return value.trim();
-    }
+function keywordSignal(text: string, keywords: string[]) {
+  const lowered = String(text || '').toLowerCase();
+  let hits = 0;
+  for (const keyword of keywords) {
+    if (lowered.includes(keyword.toLowerCase())) hits += 1;
   }
-  return '';
-}
-
-function inferCategoryComplexity(category: any) {
-  const text = String(category ?? '').toLowerCase();
-  if (!text) return 0.58;
-  if (/ai|machine learning|robotics|computer vision|hardware|iot|firmware|embedded/.test(text)) return 0.85;
-  if (/mechanical|civil|manufacturing|pcb|electronics/.test(text)) return 0.72;
-  if (/web|frontend|backend|app|software/.test(text)) return 0.56;
-  return 0.62;
-}
-
-function buildProjectSuccessReasons(metrics: {
-  talentFit: number;
-  topActorSimilarity: number;
-  scopeClarity: number;
-  budgetFeasibility: number;
-  timelineFeasibility: number;
-  novelty: number;
-  maxSimilarity: number;
-  creatorReadiness: number;
-  ndaRequired: boolean;
-}) {
-  const reasons: Array<{ impact: 'positive' | 'negative' | 'neutral'; label: string; detail: string }> = [];
-
-  if (metrics.talentFit >= 0.7) {
-    reasons.push({
-      impact: 'positive',
-      label: 'Strong actor fit',
-      detail: `Existing actor profiles align well with the project, led by a ${(metrics.topActorSimilarity * 100).toFixed(0)}% top match.`,
-    });
-  } else if (metrics.talentFit < 0.45) {
-    reasons.push({
-      impact: 'negative',
-      label: 'Limited talent coverage',
-      detail: 'Current actor embeddings show a relatively thin talent pool for this scope.',
-    });
-  }
-
-  if (metrics.scopeClarity >= 0.72) {
-    reasons.push({
-      impact: 'positive',
-      label: 'Clear project brief',
-      detail: 'The description, locked details, and skills list give collaborators a strong starting point.',
-    });
-  } else if (metrics.scopeClarity < 0.45) {
-    reasons.push({
-      impact: 'negative',
-      label: 'Brief needs detail',
-      detail: 'Adding more deliverables, technical constraints, and skills would improve project conversion.',
-    });
-  }
-
-  if (metrics.budgetFeasibility >= 0.72) {
-    reasons.push({
-      impact: 'positive',
-      label: 'Budget looks workable',
-      detail: 'The posted budget is aligned with the estimated complexity of the project.',
-    });
-  } else if (metrics.budgetFeasibility < 0.45) {
-    reasons.push({
-      impact: 'negative',
-      label: 'Budget may be tight',
-      detail: 'The current budget looks lean relative to the scope and technical complexity.',
-    });
-  }
-
-  if (metrics.timelineFeasibility >= 0.72) {
-    reasons.push({
-      impact: 'positive',
-      label: 'Timeline looks realistic',
-      detail: 'The requested schedule appears achievable for the stated scope.',
-    });
-  } else if (metrics.timelineFeasibility < 0.45) {
-    reasons.push({
-      impact: 'negative',
-      label: 'Timeline looks aggressive',
-      detail: 'The planned delivery window may be too short for the amount of work described.',
-    });
-  }
-
-  if (metrics.novelty >= 0.75) {
-    reasons.push({
-      impact: 'positive',
-      label: 'Differentiated idea',
-      detail: 'The project stands out from similar ideas already stored in the platform.',
-    });
-  } else if (metrics.maxSimilarity > 0.85) {
-    reasons.push({
-      impact: 'negative',
-      label: 'Crowded project space',
-      detail: 'The post overlaps strongly with existing ideas, which can reduce differentiation.',
-    });
-  }
-
-  if (metrics.creatorReadiness >= 0.7) {
-    reasons.push({
-      impact: 'positive',
-      label: 'Strong creator signal',
-      detail: 'The project owner profile suggests good readiness to execute and manage the project.',
-    });
-  } else if (metrics.creatorReadiness < 0.45) {
-    reasons.push({
-      impact: 'negative',
-      label: 'Owner signal is light',
-      detail: 'A more complete creator profile would increase trust and improve project follow-through.',
-    });
-  }
-
-  if (metrics.ndaRequired) {
-    reasons.push({
-      impact: 'neutral',
-      label: 'NDA gate enabled',
-      detail: 'The NDA improves idea protection, but it can slightly reduce early response volume.',
-    });
-  }
-
-  if (reasons.length === 0) {
-    reasons.push({
-      impact: 'neutral',
-      label: 'Balanced project setup',
-      detail: 'The project does not show major risk spikes, but stronger detail or market fit could improve confidence.',
-    });
-  }
-
-  return reasons.slice(0, 4);
+  return keywords.length > 0 ? clamp(hits / keywords.length) : 0;
 }
 
 function extractFirstNumber(x: any): number | null {
@@ -408,6 +333,266 @@ async function embedTextWithVertex(input: string, model = 'text-embedding-004') 
   return {data, vector};
 }
 
+async function embedTextWithFallback(input: string, model = 'text-embedding-004') {
+  try {
+    const out = await embedTextWithVertex(input, model);
+    return { vector: out.vector, source: 'vertex' as const };
+  } catch (err: any) {
+    return {
+      vector: pseudoEmbeddingFromText(input),
+      source: 'pseudo' as const,
+      error: String(err?.message || err),
+    };
+  }
+}
+
+function parseGenerateContentText(data: any) {
+  const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+  for (const candidate of candidates) {
+    const parts = candidate?.content?.parts;
+    if (!Array.isArray(parts)) continue;
+    for (const part of parts) {
+      if (typeof part?.text === 'string' && part.text.trim()) {
+        return part.text;
+      }
+    }
+  }
+  return '';
+}
+
+async function generateJsonWithVertex(prompt: string, model = getDefaultProposalCopilotModel()) {
+  const projectId = getProjectId();
+  if (!projectId) {
+    throw new Error('GCP project not configured');
+  }
+  const accessToken = await getAccessToken();
+  const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 1024,
+      responseMimeType: 'application/json',
+    },
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message || `Vertex generateContent failed with status ${res.status}`);
+  }
+
+  const text = parseGenerateContentText(data);
+  if (!text) {
+    throw new Error('Vertex generateContent returned no text output');
+  }
+
+  try {
+    return { parsed: JSON.parse(text), raw: data, model };
+  } catch {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      const slice = text.slice(start, end + 1);
+      return { parsed: JSON.parse(slice), raw: data, model };
+    }
+    throw new Error('Could not parse JSON response from Vertex copilot model');
+  }
+}
+
+async function callVertexEndpointPredict(endpointId: string, instances: any[]) {
+  const projectId = getProjectId();
+  if (!projectId) throw new Error('GCP project not configured');
+  const accessToken = await getAccessToken();
+  const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/endpoints/${endpointId}:predict`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instances }),
+  });
+  const data = await r.json();
+  if (!r.ok) {
+    throw new Error(data?.error?.message || `Vertex endpoint predict failed with status ${r.status}`);
+  }
+  return data;
+}
+
+async function listProjectPostRecords(limit = 300) {
+  try {
+    const snap = await adminDb.collection('projectPosts').limit(limit).get();
+    const items: any[] = [];
+    snap.forEach((d: FirebaseFirestore.QueryDocumentSnapshot) => items.push({ id: d.id, ...d.data() }));
+    return items;
+  } catch (err: any) {
+    if (isFirestorePermissionError(err)) return [];
+    throw err;
+  }
+}
+
+function computeAvailabilityScore(user: any) {
+  const explicit = toNumber(user?.availabilityPercent, NaN);
+  if (Number.isFinite(explicit)) return clamp(explicit / 100);
+  const activeProjects = toNumber(user?.activeProjects, 0);
+  const maxProjects = Math.max(1, toNumber(user?.maxParallelProjects, 4));
+  const loadScore = clamp(1 - activeProjects / maxProjects);
+  return clamp(loadScore * 0.7 + 0.3);
+}
+
+function computePastSuccessScore(user: any) {
+  const completed = toNumber(user?.completedProjects, 0);
+  const accepted = Math.max(completed, toNumber(user?.acceptedProjects, completed));
+  const completionRate = accepted > 0 ? clamp(completed / accepted) : 0.6;
+  const onTimeRateRaw = toNumber(user?.onTimeRate, NaN);
+  const onTimeRate = Number.isFinite(onTimeRateRaw) ? clamp(onTimeRateRaw / 100) : 0.7;
+  const disputeRateRaw = toNumber(user?.disputeRate, NaN);
+  const disputePenalty = Number.isFinite(disputeRateRaw) ? clamp(disputeRateRaw / 100) : 0.05;
+  return clamp(completionRate * 0.5 + onTimeRate * 0.4 + (1 - disputePenalty) * 0.1);
+}
+
+function computeSkillMatch(projectSkills: string[], actorSkills: string[]) {
+  if (projectSkills.length === 0 || actorSkills.length === 0) return 0;
+  const actorSet = new Set(actorSkills.map((skill) => skill.toLowerCase()));
+  let hits = 0;
+  for (const skill of projectSkills) {
+    if (actorSet.has(skill.toLowerCase())) hits += 1;
+  }
+  return clamp(hits / projectSkills.length);
+}
+
+function computeDomainExpertiseScore(category: string, user: any) {
+  const text = [
+    user?.bio,
+    user?.summary,
+    Array.isArray(user?.skills) ? user.skills.join(' ') : '',
+    user?.headline,
+    user?.domain,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  const categoryTokens = tokenize(category || '');
+  if (categoryTokens.length === 0) return 0.5;
+  const hits = categoryTokens.filter((token) => text.includes(token)).length;
+  return clamp(hits / categoryTokens.length);
+}
+
+function computeFraudHeuristic(payload: any) {
+  const expert = payload?.expert || {};
+  const review = payload?.review || {};
+  const proposal = payload?.proposal || {};
+  const behavior = payload?.behavior || {};
+
+  const reasons = {
+    fakeExperts: [] as string[],
+    fakeReviews: [] as string[],
+    suspiciousProposals: [] as string[],
+    scamBehavior: [] as string[],
+  };
+
+  let risk = 0.08;
+
+  const rating = toNumber(expert?.rating, toNumber(review?.rating, 0));
+  const reviewsCount = toNumber(expert?.reviewsCount, 0);
+  const completedProjects = toNumber(expert?.completedProjects, 0);
+  const accountAgeDays = toNumber(expert?.accountAgeDays, toNumber(behavior?.accountAgeDays, 0));
+  const verificationLevel = toNumber(expert?.verificationLevel, 50);
+
+  if (rating >= 4.9 && reviewsCount < 3) {
+    risk += 0.16;
+    reasons.fakeExperts.push('Very high rating with very low review count.');
+  }
+
+  if (accountAgeDays > 0 && accountAgeDays < 20 && completedProjects > 3) {
+    risk += 0.12;
+    reasons.fakeExperts.push('Account age is very low relative to claimed project history.');
+  }
+
+  if (verificationLevel < 40) {
+    risk += 0.08;
+    reasons.fakeExperts.push('Low verification level increases impersonation risk.');
+  }
+
+  const reviewText = String(review?.text || '');
+  const suspiciousReviewSignal = keywordSignal(reviewText, ['perfect service', '100% guaranteed', 'best ever', 'no flaws']);
+  if (suspiciousReviewSignal > 0.2 && reviewText.length < 55) {
+    risk += 0.08;
+    reasons.fakeReviews.push('Review language appears promotional and too generic.');
+  }
+
+  const proposalText = [proposal?.title, proposal?.message, proposal?.workPlan, proposal?.amount, proposal?.timeline]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  const scamKeywordScore = keywordSignal(proposalText, [
+    'whatsapp',
+    'telegram',
+    'wire transfer',
+    'crypto',
+    'gift card',
+    'outside platform',
+    'advance payment',
+  ]);
+  if (scamKeywordScore > 0) {
+    risk += 0.22 * scamKeywordScore;
+    reasons.suspiciousProposals.push('Proposal contains off-platform or risky payment language.');
+  }
+
+  const budget = parseMoney(proposal?.projectBudget);
+  const offerAmount = parseMoney(proposal?.amount);
+  if (budget > 0 && offerAmount > 0) {
+    const gap = Math.abs(offerAmount - budget) / budget;
+    if (gap > 0.65) {
+      risk += 0.1;
+      reasons.suspiciousProposals.push('Offer amount is abnormally far from project budget.');
+    }
+  }
+
+  const externalContactAttempts = toNumber(behavior?.externalContactAttempts, 0);
+  const offPlatformPaymentMentions = toNumber(behavior?.offPlatformPaymentMentions, 0);
+  const failedPayments = toNumber(behavior?.failedPayments, 0);
+  const chargebacks = toNumber(behavior?.chargebacks, 0);
+  const disputes = toNumber(behavior?.disputes, 0);
+  const rapidBidCount = toNumber(behavior?.rapidBidCount24h, 0);
+
+  const behaviorRisk = clamp(
+    externalContactAttempts * 0.12 +
+    offPlatformPaymentMentions * 0.15 +
+    failedPayments * 0.06 +
+    chargebacks * 0.1 +
+    disputes * 0.05 +
+    rapidBidCount * 0.02,
+  );
+
+  if (behaviorRisk > 0.2) {
+    reasons.scamBehavior.push('Behavioral telemetry indicates elevated scam risk.');
+  }
+
+  risk += behaviorRisk;
+  const overallRisk = clamp(risk);
+
+  return {
+    overallRisk,
+    band: riskBand(overallRisk),
+    reasons,
+    features: {
+      rating,
+      reviewsCount,
+      accountAgeDays,
+      verificationLevel,
+      scamKeywordScore,
+      behaviorRisk,
+      completedProjects,
+    },
+  };
+}
+
 async function checkVertexEmbeddingsHealth() {
   const out = await embedTextWithVertex('health probe: vertex embeddings');
   return {
@@ -445,6 +630,7 @@ router.get('/health', async (_req: Request, res: Response) => {
   const endpointId = getDefaultRankingEndpointId();
   const bidEndpointId = getDefaultBidEndpointId();
   const projectSuccessEndpointId = getDefaultProjectSuccessEndpointId();
+  const fraudEndpointId = getDefaultFraudEndpointId();
 
   const response: any = {
     ok: true,
@@ -455,6 +641,8 @@ router.get('/health', async (_req: Request, res: Response) => {
       rankingEndpointConfigured: Boolean(endpointId),
       bidEndpointConfigured: Boolean(bidEndpointId),
       projectSuccessEndpointConfigured: Boolean(projectSuccessEndpointId),
+      fraudEndpointConfigured: Boolean(fraudEndpointId),
+      proposalCopilotModel: getDefaultProposalCopilotModel(),
     },
     checks: {},
   };
@@ -545,7 +733,26 @@ router.get('/health', async (_req: Request, res: Response) => {
     response.checks.projectSuccessEndpoint = {
       ok: false,
       error: 'VERTEX_PROJECT_SUCCESS_ENDPOINT_ID is not configured',
-      hint: 'Set VERTEX_PROJECT_SUCCESS_ENDPOINT_ID in .env.local after deploying your project-success model.',
+      hint: 'Set VERTEX_PROJECT_SUCCESS_ENDPOINT_ID after deploying your project-success model.',
+    };
+  }
+
+  if (fraudEndpointId) {
+    try {
+      response.checks.fraudEndpoint = await checkRankingEndpointHealth(fraudEndpointId);
+    } catch (err: any) {
+      response.ok = false;
+      response.checks.fraudEndpoint = {
+        ok: false,
+        error: err.message,
+        hint: getActionHintForError(err),
+      };
+    }
+  } else {
+    response.checks.fraudEndpoint = {
+      ok: false,
+      error: 'VERTEX_FRAUD_ENDPOINT_ID is not configured',
+      hint: 'Set VERTEX_FRAUD_ENDPOINT_ID after deploying your fraud model (optional).',
     };
   }
 
@@ -579,8 +786,12 @@ router.post('/embeddings', async (req: Request, res: Response) => {
   try {
     const {input, model} = req.body;
     if (!input) return res.status(400).json({error: 'input required'});
-    const out = await embedTextWithVertex(input, model);
-    res.json(out);
+    const out = await embedTextWithFallback(input, model);
+    res.json({
+      vector: out.vector,
+      source: out.source,
+      warning: out.error,
+    });
   } catch (err:any) {
     res.status(getHttpStatusForError(err)).json({error: err.message, hint: getActionHintForError(err)});
   }
@@ -591,11 +802,18 @@ router.post('/embeddings/store', async (req: Request, res: Response) => {
   try {
     const {postId, text, meta = {}, model} = req.body;
     if (!text) return res.status(400).json({error: 'text required'});
-    const {vector, data} = await embedTextWithVertex(text, model);
-    if (!vector) return res.status(500).json({error: 'could not extract embedding', raw: data});
+    const out = await embedTextWithFallback(text, model);
+    const {vector} = out;
+    if (!vector) return res.status(500).json({error: 'could not generate embedding'});
     const id = String(postId || generateLocalId('emb'));
-    const saveResult = await saveEmbeddingRecord(id, {vector, meta, text, updatedAt: new Date()});
-    res.json({id, vector, storage: saveResult.storage});
+    const saveResult = await saveEmbeddingRecord(id, {
+      vector,
+      meta,
+      text,
+      embeddingSource: out.source,
+      updatedAt: new Date(),
+    });
+    res.json({id, vector, source: out.source, warning: out.error, storage: saveResult.storage});
   } catch (err:any) {
     res.status(getHttpStatusForError(err)).json({error: err.message, hint: getActionHintForError(err)});
   }
@@ -627,8 +845,20 @@ router.get('/novelty/:postId', async (req: Request, res: Response) => {
     const others = items.filter((d: any) => d.id !== postId);
     const scored = others.map(it => ({id: it.id, score: cosineSimilarity(vector, it.vector), meta: it.meta || {}})).sort((a,b)=>b.score-a.score);
     const top = scored[0];
-    const novelty = 1 - (top?.score ?? 0);
-    res.json({novelty, topSimilar: scored.slice(0,10), storage: baseStorage === 'firestore' && listStorage === 'firestore' ? 'firestore' : 'local-fallback'});
+    const novelty = clamp(1 - (top?.score ?? 0));
+    const noveltyScore = Math.round(novelty * 100);
+    const descriptionSignal = clamp(String(base?.text || '').length / 1400);
+    const innovationScore = Math.round(clamp(novelty * 0.85 + descriptionSignal * 0.15) * 100);
+    const similarProjectsFound = scored.filter((item) => item.score >= 0.75).length;
+
+    res.json({
+      novelty,
+      noveltyScore,
+      innovationScore,
+      similarProjectsFound,
+      topSimilar: scored.slice(0,10),
+      storage: baseStorage === 'firestore' && listStorage === 'firestore' ? 'firestore' : 'local-fallback',
+    });
   } catch (err:any) {
     res.status(getHttpStatusForError(err)).json({error: err.message, hint: getActionHintForError(err)});
   }
@@ -645,10 +875,15 @@ router.post('/actors/embed', async (req: Request, res: Response) => {
       if (!user) return res.status(404).json({error: 'user not found or inaccessible; provide text explicitly'});
       txt = [user?.displayName, user?.bio, (user?.skills || []).join(' '), user?.summary].filter(Boolean).join('\n');
     }
-    const {vector, data} = await embedTextWithVertex(txt, model);
-    if (!vector) return res.status(500).json({error: 'could not extract embedding', raw: data});
-    const saveResult = await saveActorEmbeddingRecord(actorId, {vector, updatedAt: new Date()});
-    res.json({actorId, vector, storage: saveResult.storage});
+    const out = await embedTextWithFallback(txt, model);
+    const {vector} = out;
+    if (!vector) return res.status(500).json({error: 'could not generate embedding'});
+    const saveResult = await saveActorEmbeddingRecord(actorId, {
+      vector,
+      embeddingSource: out.source,
+      updatedAt: new Date(),
+    });
+    res.json({actorId, vector, source: out.source, warning: out.error, storage: saveResult.storage});
   } catch (err:any) {
     res.status(getHttpStatusForError(err)).json({error: err.message, hint: getActionHintForError(err)});
   }
@@ -657,53 +892,119 @@ router.post('/actors/embed', async (req: Request, res: Response) => {
 // Rank actors for a post using embeddings + simple heuristics. If endpointId is provided, forward to Vertex endpoint for learned ranking.
 router.post('/match', async (req: Request, res: Response) => {
   try {
-    const {postId, postText, candidateIds, endpointId, topK = 10, model} = req.body;
+    const {
+      postId,
+      postText,
+      candidateIds,
+      endpointId,
+      topK = 10,
+      model,
+      projectSkills,
+      projectCategory,
+      whoNeeded,
+    } = req.body;
+
+    const skillTargets = normalizeStringArray(projectSkills);
+    const categoryText = String(projectCategory || '');
+
+    let resolvedPostText = String(postText || '');
+    if (!resolvedPostText) {
+      resolvedPostText = [
+        categoryText,
+        String(whoNeeded || ''),
+        skillTargets.join(', '),
+      ]
+        .filter(Boolean)
+        .join('\n');
+    }
+
     const resolvedEndpointId = endpointId || getDefaultRankingEndpointId();
-    const projectId = getProjectId();
     let postVector: number[] | null = null;
+
     if (postId) {
       const { item } = await getEmbeddingRecord(String(postId));
       if (item) postVector = item?.vector ?? null;
     }
-    if (!postVector && postText) {
-      const out = await embedTextWithVertex(postText, model);
+
+    if (!postVector && resolvedPostText) {
+      const out = await embedTextWithFallback(resolvedPostText, model);
       postVector = out.vector;
     }
+
     if (!postVector) {
       return res.status(400).json({error: 'Could not create post embedding. Ensure postId exists or pass valid postText.'});
     }
 
-    // If a Vertex endpoint is specified, call it with instances
-    if (resolvedEndpointId) {
-      if (!projectId) return res.status(500).json({error: 'GCP project not configured'});
-      const accessToken = await getAccessToken();
-      const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/endpoints/${resolvedEndpointId}:predict`;
-      const instances = (candidateIds || []).map((id:any)=>({postVector, actorId: id}));
-      const r = await fetch(url, {method: 'POST', headers: {Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json'}, body: JSON.stringify({instances})});
-      const data = await r.json();
-      if (!r.ok) {
-        return res.status(r.status).json({error: data?.error?.message || 'Vertex ranking endpoint call failed', raw: data});
+    // If a Vertex endpoint is specified, call it with instances first.
+    if (resolvedEndpointId && Array.isArray(candidateIds) && candidateIds.length > 0) {
+      try {
+        const instances = candidateIds.map((id:any)=>({postVector, actorId: id}));
+        const data = await callVertexEndpointPredict(resolvedEndpointId, instances);
+        const preds = Array.isArray(data?.predictions) ? data.predictions : [];
+        const results = candidateIds.map((id: string, index: number) => {
+          const predicted = extractFirstNumber(preds[index]) ?? extractFirstNumber(preds) ?? 0;
+          const score = clamp(predicted);
+          return {
+            actorId: id,
+            displayName: id,
+            sim: score,
+            skillsMatch: Math.round(score * 100),
+            domainExpertise: Math.round(score * 100),
+            availability: Math.round(score * 100),
+            pastProjectSuccess: Math.round(score * 100),
+            finalScore: score,
+            source: 'vertex',
+          };
+        });
+        return res.json({results: results.slice(0, topK), source: 'vertex', raw: data});
+      } catch (vertexErr: any) {
+        // Continue with heuristic ranking fallback.
+        console.warn('Vertex match endpoint failed; falling back to heuristic ranking.', vertexErr?.message || vertexErr);
       }
-      return res.json({fromVertex: true, raw: data});
     }
 
-    // Fetch actor embeddings
+    // Fetch actor embeddings for heuristic ranking.
     const { items: actorDocs, storage } = await listActorEmbeddingRecords(candidateIds);
 
     const results: any[] = [];
     for (const a of actorDocs) {
       const sim = cosineSimilarity(postVector, a.vector || []);
-      // Fetch user profile for heuristics
       const user = (await getUserProfileRecord(a.actorId)) || {};
       const rating = (user?.rating ?? user?.avgRating ?? 0);
       const years = (user?.experienceYears ?? user?.yearsExperience ?? user?.years ?? 0);
       const ratingNorm = Math.max(0, Math.min(1, rating / 5));
-      const expNorm = Math.max(0, Math.min(1, Math.min(10, years) / 10));
-      const finalScore = sim * 0.7 + ratingNorm * 0.2 + expNorm * 0.1;
-      results.push({actorId: a.actorId, sim, rating, years, finalScore, user});
+      const actorSkills = normalizeStringArray(user?.skills || user?.profileDetails?.skills);
+      const skillsMatch = computeSkillMatch(skillTargets, actorSkills);
+      const domainExpertise = computeDomainExpertiseScore(categoryText, user);
+      const availability = computeAvailabilityScore(user);
+      const pastProjectSuccess = computePastSuccessScore(user);
+
+      const finalScore = clamp(
+        sim * 0.4 +
+        skillsMatch * 0.2 +
+        domainExpertise * 0.15 +
+        availability * 0.1 +
+        pastProjectSuccess * 0.1 +
+        ratingNorm * 0.05,
+      );
+
+      results.push({
+        actorId: a.actorId,
+        displayName: String(user?.displayName || user?.name || a.actorId),
+        sim,
+        rating,
+        years,
+        skillsMatch: Math.round(skillsMatch * 100),
+        domainExpertise: Math.round(domainExpertise * 100),
+        availability: Math.round(availability * 100),
+        pastProjectSuccess: Math.round(pastProjectSuccess * 100),
+        finalScore,
+        source: 'heuristic',
+      });
     }
+
     results.sort((a,b)=>b.finalScore - a.finalScore);
-    res.json({results: results.slice(0, topK), storage});
+    res.json({results: results.slice(0, topK), storage, source: 'heuristic'});
   } catch (err:any) {
     res.status(getHttpStatusForError(err)).json({error: err.message, hint: getActionHintForError(err)});
   }
@@ -758,7 +1059,7 @@ router.post('/bid-success', async (req: Request, res: Response) => {
       if (item?.vector) postVector = item.vector;
     }
     if (!postVector && resolvedPostText) {
-      const out = await embedTextWithVertex(resolvedPostText, model);
+      const out = await embedTextWithFallback(resolvedPostText, model);
       postVector = out.vector;
     }
 
@@ -781,7 +1082,7 @@ router.post('/bid-success', async (req: Request, res: Response) => {
       if (item?.vector) actorVector = item.vector;
     }
     if (!actorVector && resolvedActorText) {
-      const out = await embedTextWithVertex(resolvedActorText, model);
+      const out = await embedTextWithFallback(resolvedActorText, model);
       actorVector = out.vector;
     }
 
@@ -859,7 +1160,69 @@ router.post('/bid-success', async (req: Request, res: Response) => {
   }
 });
 
-// Predict project success probability using a Vertex endpoint (if configured) or heuristic fallback.
+// Semantic idea search using embeddings (with pseudo-embedding fallback).
+router.post('/semantic-search', async (req: Request, res: Response) => {
+  try {
+    const { query, k = 5, minScore = 0.25, model } = req.body;
+    if (!query || String(query).trim().length < 2) {
+      return res.status(400).json({ error: 'query required' });
+    }
+
+    const cleanedQuery = String(query).trim();
+    const queryEmbedding = await embedTextWithFallback(cleanedQuery, model);
+    const { items, storage } = await listEmbeddingRecords();
+
+    const scoredFromEmbeddings = items
+      .map((item) => ({
+        id: String(item.id),
+        score: cosineSimilarity(queryEmbedding.vector, item.vector || []),
+        meta: item.meta || {},
+        text: String(item.text || ''),
+      }))
+      .filter((item) => item.score >= Number(minScore || 0))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, Number(k || 5));
+
+    let scored = scoredFromEmbeddings;
+    let source = queryEmbedding.source === 'vertex' ? 'vertex-embeddings' : 'pseudo-embeddings';
+
+    if (scored.length === 0) {
+      const posts = await listProjectPostRecords(250);
+      scored = posts
+        .map((post) => {
+          const text = [post?.title, post?.description, post?.fullDetails, normalizeStringArray(post?.skills).join(' ')].filter(Boolean).join(' ');
+          return {
+            id: String(post.id),
+            score: lexicalSimilarityFromText(cleanedQuery, text),
+            meta: { category: post?.category },
+            text,
+          };
+        })
+        .filter((item) => item.score >= Number(minScore || 0))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, Number(k || 5));
+      source = 'lexical-fallback';
+    }
+
+    const results: any[] = [];
+    for (const candidate of scored) {
+      const post = await getProjectPostRecord(candidate.id);
+      results.push({
+        postId: candidate.id,
+        title: String(post?.title || candidate?.meta?.title || `Project ${candidate.id}`),
+        category: String(post?.category || candidate?.meta?.category || 'General'),
+        score: Math.round(clamp(candidate.score) * 100),
+        similarity: clamp(candidate.score),
+      });
+    }
+
+    return res.json({ results, source, storage });
+  } catch (err: any) {
+    res.status(getHttpStatusForError(err)).json({ error: err.message, hint: getActionHintForError(err) });
+  }
+});
+
+// Project success prediction for timeline/delivery risk.
 router.post('/project-success', async (req: Request, res: Response) => {
   try {
     const {
@@ -872,219 +1235,519 @@ router.post('/project-success', async (req: Request, res: Response) => {
       timeline,
       skills,
       whoNeeded,
-      requireNda,
       creatorId,
       endpointId,
-      model,
     } = req.body;
 
-    let resolvedTitle = title ? String(title) : '';
-    let resolvedDescription = description ? String(description) : '';
-    let resolvedFullDetails = fullDetails ? String(fullDetails) : '';
-    let resolvedCategory = category ? String(category) : '';
-    let resolvedBudget = budget;
-    let resolvedTimeline = timeline;
-    let resolvedSkills = normalizeStringArray(skills);
-    let resolvedWhoNeeded = whoNeeded ? String(whoNeeded) : '';
-    let resolvedRequireNda = Boolean(requireNda);
-    let resolvedCreatorId = creatorId ? String(creatorId) : '';
-
+    let post: any = null;
     if (postId) {
-      const post = await getProjectPostRecord(String(postId));
-      if (post) {
-        if (!resolvedTitle) resolvedTitle = String(post?.title ?? '');
-        if (!resolvedDescription) resolvedDescription = String(post?.description ?? '');
-        if (!resolvedFullDetails) resolvedFullDetails = String(post?.fullDetails ?? '');
-        if (!resolvedCategory) resolvedCategory = String(post?.category ?? '');
-        if (resolvedBudget === undefined || resolvedBudget === null || resolvedBudget === '') resolvedBudget = post?.budget;
-        if (resolvedTimeline === undefined || resolvedTimeline === null || resolvedTimeline === '') resolvedTimeline = post?.timeline;
-        if (resolvedSkills.length === 0) resolvedSkills = normalizeStringArray(post?.skills);
-        if (!resolvedWhoNeeded) resolvedWhoNeeded = String(post?.whoNeeded ?? '');
-        if (requireNda === undefined) resolvedRequireNda = Boolean(post?.requireNda);
-        if (!resolvedCreatorId && post?.createdBy) resolvedCreatorId = String(post.createdBy);
-      }
+      post = await getProjectPostRecord(String(postId));
     }
 
-    const combinedText = [
-      resolvedTitle,
-      resolvedDescription,
-      resolvedFullDetails,
-      resolvedCategory ? `Category: ${resolvedCategory}` : '',
-      resolvedWhoNeeded ? `Who needed: ${resolvedWhoNeeded}` : '',
-      resolvedSkills.length > 0 ? `Skills: ${resolvedSkills.join(', ')}` : '',
-      resolvedBudget ? `Budget: ${resolvedBudget}` : '',
-      resolvedTimeline ? `Timeline: ${resolvedTimeline}` : '',
-    ].filter(Boolean).join('\n');
+    const resolvedTitle = String(title || post?.title || '');
+    const resolvedDescription = String(description || post?.description || '');
+    const resolvedFullDetails = String(fullDetails || post?.fullDetails || '');
+    const resolvedCategory = String(category || post?.category || '');
+    const resolvedBudget = budget ?? post?.budget;
+    const resolvedTimeline = timeline ?? post?.timeline;
+    const resolvedSkills = normalizeStringArray(skills?.length ? skills : post?.skills);
+    const resolvedWhoNeeded = String(whoNeeded || post?.whoNeeded || '');
 
-    if (!combinedText.trim()) {
-      return res.status(400).json({ error: 'postId or project fields required' });
-    }
-
-    let postVector: number[] | null = null;
-    if (postId) {
-      const { item } = await getEmbeddingRecord(String(postId));
-      if (item?.vector) postVector = item.vector;
-    }
-    if (!postVector) {
-      const out = await embedTextWithVertex(combinedText, model);
-      postVector = out.vector;
-    }
-
-    let novelty = 0.5;
-    let maxSimilarity = 0;
-    if (postVector) {
-      const { items } = await listEmbeddingRecords();
-      const others = items.filter((item: any) => String(item.id) !== String(postId || ''));
-      if (others.length > 0) {
-        const similarities = others.map((item: any) => cosineSimilarity(postVector, item.vector || []));
-        maxSimilarity = Math.max(...similarities);
-        novelty = clamp(1 - maxSimilarity);
-      } else {
-        novelty = 1;
-      }
-    }
-
-    let candidateCount = 0;
-    let topActorSimilarity = 0;
-    let avgTopActorSimilarity = 0;
-    if (postVector) {
-      const { items: actorDocs } = await listActorEmbeddingRecords();
-      const similarities = actorDocs
-        .map((actor: any) => cosineSimilarity(postVector, actor.vector || []))
-        .filter((value: number) => Number.isFinite(value))
-        .sort((a, b) => b - a);
-      candidateCount = similarities.length;
-      topActorSimilarity = similarities[0] ?? 0;
-      avgTopActorSimilarity = average(similarities.slice(0, 5));
-    }
-
-    const creator = resolvedCreatorId ? await getUserProfileRecord(resolvedCreatorId) : null;
-    const creatorHasBio = Boolean(pickNestedText(creator, ['bio', 'summary', 'previousWorkDescription']));
-    const creatorProfileCompleteness = creator
-      ? average([
-          creator?.displayName ? 1 : 0,
-          creator?.location ? 1 : 0,
-          creator?.profileDetails ? 1 : 0,
-          creatorHasBio ? 1 : 0,
-        ])
-      : 0.55;
-    const creatorTrust = clamp(pickNestedNumber(creator, ['trustScore'], creator ? 60 : 55) / 100);
-    const creatorCompletedProjects = clamp(Math.min(20, pickNestedNumber(creator, ['completedProjects'], 0)) / 20);
-    const creatorProjectsPosted = clamp(Math.min(20, pickNestedNumber(creator, ['projectsPosted'], 0)) / 20);
-    const creatorReadiness = creator
-      ? clamp(
-          creatorProfileCompleteness * 0.45 +
-          creatorTrust * 0.2 +
-          creatorCompletedProjects * 0.2 +
-          creatorProjectsPosted * 0.15,
-        )
-      : 0.55;
-
-    const skillCount = resolvedSkills.length;
-    const descriptionLength = resolvedDescription.trim().length;
-    const fullDetailsLength = resolvedFullDetails.trim().length;
+    const detailQuality = clamp((resolvedDescription.length + resolvedFullDetails.length) / 1800);
+    const skillComplexity = clamp(resolvedSkills.length / 10);
+    const ambiguity = keywordSignal(`${resolvedDescription}\n${resolvedFullDetails}`, ['etc', 'tbd', 'maybe', 'later', 'flexible', 'to be decided']);
     const budgetValue = parseMoney(resolvedBudget);
     const timelineDays = parseDays(resolvedTimeline);
-    const categoryComplexity = inferCategoryComplexity(resolvedCategory);
-    const skillDefinition = clamp(skillCount / 6);
-    const scopeClarity = clamp(
-      clamp(descriptionLength / 260) * 0.35 +
-      clamp(fullDetailsLength / 900) * 0.4 +
-      skillDefinition * 0.15 +
-      (resolvedWhoNeeded ? 0.1 : 0),
-    );
-    const complexityScore = clamp(
-      categoryComplexity * 0.4 +
-      clamp(skillCount / 8) * 0.25 +
-      clamp((descriptionLength + fullDetailsLength) / 1600) * 0.35,
-    );
-    const expectedBudget = 1200 + skillCount * 500 + timelineDays * 65 + categoryComplexity * 2500 + complexityScore * 1800;
-    const recommendedDays = Math.max(10, Math.round(skillCount * 5 + categoryComplexity * 24 + complexityScore * 28));
-    const budgetFeasibility = budgetValue > 0 ? clamp(budgetValue / Math.max(expectedBudget, 1)) : 0.4;
-    const timelineFeasibility = timelineDays > 0 ? clamp(timelineDays / recommendedDays) : 0.45;
-    const marketDepth = clamp(Math.log10(candidateCount + 1));
-    const talentFit = candidateCount > 0
-      ? clamp(topActorSimilarity * 0.6 + avgTopActorSimilarity * 0.25 + marketDepth * 0.15)
-      : 0.35;
-    const noveltyAdvantage = clamp(0.45 + novelty * 0.55);
-    const ndaScore = resolvedRequireNda ? 0.86 : 0.96;
-    const budgetPerSkill = skillCount > 0 ? budgetValue / skillCount : budgetValue;
-    const daysPerSkill = skillCount > 0 ? timelineDays / skillCount : timelineDays;
+    const baselineBudget = 1600 + resolvedSkills.length * 650 + skillComplexity * 3000;
+    const budgetAdequacy = budgetValue > 0 ? clamp(budgetValue / baselineBudget) : 0.55;
+    const timelinePressure = timelineDays > 0 ? clamp((45 - timelineDays) / 45) : 0.4;
+
+    const creatorProfile = creatorId ? (await getUserProfileRecord(String(creatorId))) || {} : {};
+    const creatorReliability = computePastSuccessScore(creatorProfile);
+
+    let noveltySignal = 0.55;
+    if (postId) {
+      const { item: base } = await getEmbeddingRecord(String(postId));
+      if (base?.vector) {
+        const { items } = await listEmbeddingRecords();
+        const bestSimilarity = items
+          .filter((entry) => String(entry.id) !== String(postId))
+          .map((entry) => cosineSimilarity(base.vector, entry.vector || []))
+          .sort((a, b) => b - a)[0] ?? 0.35;
+        noveltySignal = clamp(1 - bestSimilarity);
+      }
+    }
 
     const features = {
-      scopeClarity,
-      budgetFeasibility,
-      timelineFeasibility,
-      talentFit,
-      creatorReadiness,
-      novelty,
-      noveltyAdvantage,
-      maxSimilarity,
-      budget: budgetValue,
-      timelineDays,
-      skillCount,
-      skillDefinition,
-      categoryComplexity,
-      complexityScore,
-      candidateCount,
-      topActorSimilarity,
-      avgTopActorSimilarity,
-      marketDepth,
-      descriptionLength,
-      fullDetailsLength,
-      budgetPerSkill,
-      daysPerSkill,
-      ndaRequired: resolvedRequireNda ? 1 : 0,
+      detailQuality,
+      skillComplexity,
+      ambiguity,
+      budgetAdequacy,
+      timelinePressure,
+      creatorReliability,
+      noveltySignal,
+      categorySignal: keywordSignal(resolvedCategory, ['ai', 'iot', 'embedded', 'health', 'robot', 'security']),
+      talentSignal: keywordSignal(resolvedWhoNeeded, ['senior', 'lead', 'expert', 'full stack', 'firmware', 'embedded']),
     };
-
-    const reasons = buildProjectSuccessReasons({
-      talentFit,
-      topActorSimilarity,
-      scopeClarity,
-      budgetFeasibility,
-      timelineFeasibility,
-      novelty,
-      maxSimilarity,
-      creatorReadiness,
-      ndaRequired: resolvedRequireNda,
-    });
 
     const resolvedEndpointId = endpointId || getDefaultProjectSuccessEndpointId();
     if (resolvedEndpointId) {
-      const projectId = getProjectId();
-      if (!projectId) return res.status(500).json({ error: 'GCP project not configured' });
-
-      const accessToken = await getAccessToken();
-      const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/endpoints/${resolvedEndpointId}:predict`;
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instances: [features] }),
-      });
-      const data = await r.json();
-      if (!r.ok) {
-        return res.status(r.status).json({ error: data?.error?.message || 'Vertex project-success endpoint call failed', raw: data });
-      }
-
-      const predicted = extractFirstNumber(data?.predictions) ?? extractFirstNumber(data);
-      if (predicted !== null) {
-        const probability = clamp(predicted);
-        return res.json({ probability, band: successBand(probability), source: 'vertex', features, reasons, raw: data });
+      try {
+        const data = await callVertexEndpointPredict(resolvedEndpointId, [features]);
+        const predicted = extractFirstNumber(data?.predictions) ?? extractFirstNumber(data);
+        if (predicted !== null) {
+          const probability = clamp(predicted);
+          const delayRisk = clamp(
+            timelinePressure * 0.45 +
+            (1 - detailQuality) * 0.25 +
+            ambiguity * 0.2 +
+            (1 - budgetAdequacy) * 0.1,
+          );
+          const failureProbability = clamp(1 - probability + delayRisk * 0.2);
+          return res.json({
+            probability,
+            successProbability: probability,
+            failureProbability,
+            delayRisk,
+            delayRiskBand: riskBand(delayRisk),
+            band: successBand(probability),
+            risk: riskBand(failureProbability),
+            source: 'vertex',
+            reasons: [
+              {
+                impact: probability >= 0.5 ? 'positive' : 'negative',
+                label: 'Vertex Model Score',
+                detail: 'Prediction generated from deployed Vertex endpoint using project feature signals.',
+              },
+            ],
+            raw: data,
+          });
+        }
+      } catch (endpointError: any) {
+        console.warn('Project-success Vertex endpoint failed; using heuristic.', endpointError?.message || endpointError);
       }
     }
 
     const probability = clamp(
-      scopeClarity * 0.22 +
-      budgetFeasibility * 0.18 +
-      timelineFeasibility * 0.15 +
-      talentFit * 0.18 +
-      creatorReadiness * 0.1 +
-      noveltyAdvantage * 0.1 +
-      ndaScore * 0.03 +
-      skillDefinition * 0.04,
+      detailQuality * 0.23 +
+      budgetAdequacy * 0.2 +
+      (1 - ambiguity) * 0.14 +
+      (1 - timelinePressure) * 0.14 +
+      creatorReliability * 0.16 +
+      noveltySignal * 0.13,
     );
 
-    return res.json({ probability, band: successBand(probability), source: 'heuristic', features, reasons });
+    const delayRisk = clamp(
+      timelinePressure * 0.45 +
+      ambiguity * 0.25 +
+      (1 - detailQuality) * 0.2 +
+      (1 - budgetAdequacy) * 0.1,
+    );
+
+    const failureProbability = clamp(1 - probability + delayRisk * 0.2);
+
+    const reasons = [
+      {
+        impact: detailQuality >= 0.55 ? 'positive' : 'negative',
+        label: 'Project Clarity',
+        detail: detailQuality >= 0.55
+          ? 'Requirements contain enough implementation detail for execution planning.'
+          : 'Requirements are short or vague, increasing delivery uncertainty.',
+      },
+      {
+        impact: timelinePressure <= 0.5 ? 'positive' : 'negative',
+        label: 'Timeline Feasibility',
+        detail: timelinePressure <= 0.5
+          ? 'Timeline appears achievable for declared scope.'
+          : 'Timeline is tight relative to complexity and may cause delays.',
+      },
+      {
+        impact: creatorReliability >= 0.6 ? 'positive' : 'neutral',
+        label: 'Creator Reliability',
+        detail: creatorReliability >= 0.6
+          ? 'Historical profile signals indicate above-average delivery reliability.'
+          : 'Limited creator history is available; estimate is less certain.',
+      },
+    ];
+
+    return res.json({
+      probability,
+      successProbability: probability,
+      failureProbability,
+      delayRisk,
+      delayRiskBand: riskBand(delayRisk),
+      band: successBand(probability),
+      risk: riskBand(failureProbability),
+      source: 'heuristic',
+      reasons,
+      features,
+    });
+  } catch (err: any) {
+    res.status(getHttpStatusForError(err)).json({ error: err.message, hint: getActionHintForError(err) });
+  }
+});
+
+async function handleFraudDetect(req: Request, res: Response) {
+  try {
+    const heuristic = computeFraudHeuristic(req.body || {});
+    const endpointId = req.body?.endpointId || getDefaultFraudEndpointId();
+
+    if (endpointId) {
+      try {
+        const data = await callVertexEndpointPredict(endpointId, [heuristic.features]);
+        const predicted = extractFirstNumber(data?.predictions) ?? extractFirstNumber(data);
+        if (predicted !== null) {
+          const overallRisk = clamp((heuristic.overallRisk + clamp(predicted)) / 2);
+          return res.json({
+            overallRisk,
+            band: riskBand(overallRisk),
+            reasons: heuristic.reasons,
+            source: 'vertex+heuristic',
+            features: heuristic.features,
+            raw: data,
+          });
+        }
+      } catch (endpointError: any) {
+        console.warn('Fraud endpoint failed; using heuristic.', endpointError?.message || endpointError);
+      }
+    }
+
+    return res.json({ ...heuristic, source: 'heuristic' });
+  } catch (err: any) {
+    res.status(getHttpStatusForError(err)).json({ error: err.message, hint: getActionHintForError(err) });
+  }
+}
+
+// Fraud detection endpoint aliases (both paths supported).
+router.post('/fraud-detect', handleFraudDetect);
+router.post('/fraud/detect', handleFraudDetect);
+
+// Team chemistry ranking for shortlisted actors.
+router.post('/team-chemistry', async (req: Request, res: Response) => {
+  try {
+    const {
+      postId,
+      postText,
+      candidateIds,
+      topK = 5,
+      projectSkills,
+      projectCategory,
+      whoNeeded,
+      model,
+    } = req.body;
+
+    let postVector: number[] | null = null;
+    if (postId) {
+      const stored = await getEmbeddingRecord(String(postId));
+      postVector = stored.item?.vector || null;
+    }
+
+    const contextText = [
+      String(postText || ''),
+      String(projectCategory || ''),
+      String(whoNeeded || ''),
+      normalizeStringArray(projectSkills).join(', '),
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    if (!postVector && contextText) {
+      const embedded = await embedTextWithFallback(contextText, model);
+      postVector = embedded.vector;
+    }
+
+    const skillTargets = normalizeStringArray(projectSkills);
+    const { items } = await listActorEmbeddingRecords(candidateIds);
+    const results: any[] = [];
+
+    for (const actor of items) {
+      const user = (await getUserProfileRecord(String(actor.actorId))) || {};
+      const actorSkills = normalizeStringArray(user?.skills || user?.profileDetails?.skills);
+      const semanticFit = postVector ? cosineSimilarity(postVector, actor.vector || []) : 0.5;
+      const skillFit = computeSkillMatch(skillTargets, actorSkills);
+      const collaborationFit = clamp(skillFit * 0.45 + computeAvailabilityScore(user) * 0.25 + (1 - clamp(toNumber(user?.disputeRate, 6) / 100)) * 0.3);
+      const communicationFit = clamp(
+        clamp(String(user?.bio || user?.summary || '').length / 450) * 0.35 +
+        keywordSignal(String(user?.bio || user?.summary || ''), ['communication', 'collaboration', 'updates', 'standup', 'async']) * 0.4 +
+        semanticFit * 0.25,
+      );
+      const reliabilityFit = computePastSuccessScore(user);
+      const chemistryScore = Math.round(clamp(collaborationFit * 0.4 + communicationFit * 0.3 + reliabilityFit * 0.3) * 100);
+
+      results.push({
+        actorId: String(actor.actorId),
+        displayName: String(user?.displayName || user?.name || actor.actorId),
+        chemistryScore,
+        collaborationFit: Math.round(collaborationFit * 100),
+        communicationFit: Math.round(communicationFit * 100),
+        reliabilityFit: Math.round(reliabilityFit * 100),
+      });
+    }
+
+    results.sort((a, b) => b.chemistryScore - a.chemistryScore);
+    res.json({ results: results.slice(0, Number(topK || 5)), source: 'heuristic+semantic' });
+  } catch (err: any) {
+    res.status(getHttpStatusForError(err)).json({ error: err.message, hint: getActionHintForError(err) });
+  }
+});
+
+// Dynamic pricing recommendation.
+router.post('/dynamic-pricing', async (req: Request, res: Response) => {
+  try {
+    const {
+      title,
+      description,
+      fullDetails,
+      category,
+      skills,
+      budget,
+      timeline,
+    } = req.body;
+
+    const text = [title, description, fullDetails, category, normalizeStringArray(skills).join(' ')].filter(Boolean).join(' ');
+    const skillList = normalizeStringArray(skills);
+    const complexityScore = clamp(skillList.length / 10 + clamp(String(fullDetails || '').length / 1400) * 0.6 + keywordSignal(text, ['integration', 'real-time', 'secure', 'embedded', 'firmware', 'multi-tenant']) * 0.4);
+    const marketDemandScore = clamp(keywordSignal(text, ['ai', 'iot', 'robotics', 'security', 'health', 'fintech']) * 0.7 + 0.3);
+    const timelineDays = parseDays(timeline);
+    const urgencyScore = timelineDays > 0 ? clamp((40 - timelineDays) / 40) : 0.45;
+    const scarceTalentScore = clamp(keywordSignal(text, ['embedded', 'fpga', 'mlops', 'firmware', 'rtos', 'edge']) * 0.8 + skillList.length / 20);
+
+    const baseline = 1800 + complexityScore * 7000 + marketDemandScore * 4200 + urgencyScore * 2200 + scarceTalentScore * 2800;
+    const budgetInput = parseMoney(budget);
+    const recommendedBudget = Math.round(budgetInput > 0 ? baseline * 0.62 + budgetInput * 0.38 : baseline);
+    const spread = Math.max(450, Math.round(recommendedBudget * 0.18));
+
+    const guidance = [
+      urgencyScore > 0.65
+        ? 'Tight timeline pushes pricing up; consider extending timeline to reduce burn.'
+        : 'Timeline is reasonable for current complexity.',
+      scarceTalentScore > 0.6
+        ? 'Specialized skills are scarce, so retainers or milestone bonuses improve close rates.'
+        : 'Talent supply appears balanced for this scope.',
+      complexityScore > 0.65
+        ? 'Complexity is high. Split project into milestones to control budget variance.'
+        : 'Complexity is moderate; fixed milestone pricing should be feasible.',
+    ];
+
+    return res.json({
+      recommendedBudget,
+      suggestedRange: {
+        min: Math.max(500, recommendedBudget - spread),
+        max: recommendedBudget + spread,
+      },
+      marketDemandScore: Math.round(marketDemandScore * 100),
+      complexityScore: Math.round(complexityScore * 100),
+      urgencyScore: Math.round(urgencyScore * 100),
+      scarceTalentScore: Math.round(scarceTalentScore * 100),
+      guidance,
+      source: 'heuristic',
+    });
+  } catch (err: any) {
+    res.status(getHttpStatusForError(err)).json({ error: err.message, hint: getActionHintForError(err) });
+  }
+});
+
+// Scope creep prediction.
+router.post('/scope-creep', async (req: Request, res: Response) => {
+  try {
+    const { description, fullDetails, skills, timeline, whoNeeded } = req.body;
+    const detailText = [description, fullDetails, whoNeeded].filter(Boolean).join('\n');
+    const skillList = normalizeStringArray(skills);
+    const timelineDays = parseDays(timeline);
+
+    const ambiguity = clamp(
+      keywordSignal(detailText, ['etc', 'later', 'maybe', 'tbd', 'flexible', 'open ended', 'to be decided']) * 0.65 +
+      (String(fullDetails || '').length < 240 ? 0.35 : 0),
+    );
+    const integrationComplexity = clamp(skillList.length / 9 + keywordSignal(detailText, ['integration', 'hardware', 'api', 'realtime', 'cross-platform']) * 0.5);
+    const timelinePressure = timelineDays > 0 ? clamp((32 - timelineDays) / 32) : 0.4;
+
+    const creepRisk = clamp(ambiguity * 0.38 + integrationComplexity * 0.36 + timelinePressure * 0.18 + (skillList.length > 6 ? 0.08 : 0));
+    const scopeCreepScore = Math.round(creepRisk * 100);
+
+    const mitigations = [
+      'Freeze requirements at each milestone and route changes through a single backlog.',
+      'Break deliverables into weekly acceptance checkpoints with explicit definitions of done.',
+      'Track each change request with time and budget impact before approval.',
+    ];
+
+    if (ambiguity > 0.6) {
+      mitigations.unshift('Rewrite user stories with measurable acceptance criteria to reduce interpretation drift.');
+    }
+
+    return res.json({
+      scopeCreepScore,
+      band: riskBand(creepRisk),
+      mitigations,
+      source: 'heuristic',
+    });
+  } catch (err: any) {
+    res.status(getHttpStatusForError(err)).json({ error: err.message, hint: getActionHintForError(err) });
+  }
+});
+
+// Failure recovery recommendations.
+router.post('/failure-recovery', async (req: Request, res: Response) => {
+  try {
+    const progressPercent = clamp(toNumber(req.body?.progressPercent, 0) / 100) * 100;
+    const timelineDays = Math.max(1, toNumber(req.body?.timelineDays, 30));
+    const elapsedDays = Math.max(0, toNumber(req.body?.elapsedDays, Math.round(timelineDays * 0.5)));
+    const changeRequestsCount = Math.max(0, toNumber(req.body?.changeRequestsCount, 0));
+    const stakeholderCount = Math.max(1, toNumber(req.body?.stakeholderCount, 2));
+
+    const expectedProgress = clamp(elapsedDays / timelineDays) * 100;
+    const scheduleSlip = clamp((expectedProgress - progressPercent) / 100);
+    const changePressure = clamp(changeRequestsCount / 6);
+    const stakeholderPressure = clamp((stakeholderCount - 2) / 8);
+
+    const recoveryRisk = clamp(scheduleSlip * 0.45 + changePressure * 0.3 + stakeholderPressure * 0.15 + (progressPercent < 35 ? 0.12 : 0.03));
+    const status = recoveryRisk >= 0.7 ? 'struggling' : recoveryRisk >= 0.4 ? 'watch' : 'stable';
+
+    const recommendations = [
+      {
+        title: 'Split the next milestone into smaller deliverables',
+        why: 'Short cycles reduce uncertainty and quickly expose blockers before they cascade.',
+      },
+    ];
+
+    if (changePressure >= 0.45) {
+      recommendations.unshift({
+        title: 'Add an embedded engineer to absorb change requests',
+        why: 'High change volume indicates team capacity is below incoming scope demand.',
+      });
+    }
+
+    if (scheduleSlip >= 0.35) {
+      recommendations.push({
+        title: 'Extend timeline by one iteration',
+        why: 'Current pace trails expected progress and requires schedule correction to protect quality.',
+      });
+    }
+
+    return res.json({
+      status,
+      recoveryRisk,
+      band: riskBand(recoveryRisk),
+      expectedProgress: Math.round(expectedProgress),
+      scheduleSlip: Number(scheduleSlip.toFixed(3)),
+      recommendations,
+      source: 'heuristic',
+    });
+  } catch (err: any) {
+    res.status(getHttpStatusForError(err)).json({ error: err.message, hint: getActionHintForError(err) });
+  }
+});
+
+// Reputation trust score.
+router.post('/reputation-score', async (req: Request, res: Response) => {
+  try {
+    const { userId, profile } = req.body;
+    const persisted = userId ? (await getUserProfileRecord(String(userId))) || {} : {};
+    const merged = { ...persisted, ...(profile || {}) };
+
+    const reliability = computePastSuccessScore(merged);
+    const onTimeRateRaw = toNumber(merged?.onTimeRate, NaN);
+    const delivery = Number.isFinite(onTimeRateRaw)
+      ? clamp(onTimeRateRaw / 100)
+      : clamp((toNumber(merged?.completedProjects, 0) + 3) / (toNumber(merged?.acceptedProjects, 0) + 5));
+    const verification = clamp(toNumber(merged?.verificationLevel, 72) / 100);
+    const trust = clamp(reliability * 0.45 + delivery * 0.35 + verification * 0.2);
+
+    return res.json({
+      reliabilityScore: Math.round(reliability * 100),
+      deliveryScore: Math.round(delivery * 100),
+      trustScore: Math.round(trust * 100),
+      source: userId ? 'profile+history' : 'profile-only',
+    });
+  } catch (err: any) {
+    res.status(getHttpStatusForError(err)).json({ error: err.message, hint: getActionHintForError(err) });
+  }
+});
+
+// Proposal copilot draft generation using Vertex generateContent with safe template fallback.
+router.post('/proposal-copilot', async (req: Request, res: Response) => {
+  try {
+    const project = req.body?.project || {};
+    const actor = req.body?.actor || {};
+    const preferences = req.body?.preferences || {};
+
+    const fallbackDraft = {
+      title: String(project?.title || 'Proposal for your project'),
+      message: `Hi, I reviewed your ${String(project?.category || 'engineering')} project and can deliver a strong implementation plan with predictable milestones and clear communication.`,
+      workPlan: [
+        '1) Align on requirements and acceptance criteria.',
+        '2) Build core implementation and run integration tests.',
+        '3) Deliver documentation and deployment handover.',
+      ].join('\n'),
+      notes: 'Open to refining scope and timeline based on your priority constraints.',
+    };
+
+    let draft = fallbackDraft;
+    let source = 'template';
+    let modelUsed = '';
+
+    const prompt = [
+      'Generate a professional engineering proposal in JSON only.',
+      'Return shape: {"draft":{"title":"","message":"","workPlan":"","notes":""}}',
+      `Project title: ${String(project?.title || '')}`,
+      `Project description: ${String(project?.description || '')}`,
+      `Project details: ${String(project?.fullDetails || '')}`,
+      `Project category: ${String(project?.category || '')}`,
+      `Project budget: ${String(project?.budget || '')}`,
+      `Project timeline: ${String(project?.timeline || '')}`,
+      `Project skills: ${normalizeStringArray(project?.skills).join(', ')}`,
+      `Actor name: ${String(actor?.name || '')}`,
+      `Actor skills: ${normalizeStringArray(actor?.skills).join(', ')}`,
+      `Actor experience years: ${String(actor?.experienceYears || '')}`,
+      `Preferred amount: ${String(preferences?.amount || '')}`,
+      `Preferred timeline: ${String(preferences?.timeline || '')}`,
+      `Tone: ${String(preferences?.tone || 'professional')}`,
+    ].join('\n');
+
+    try {
+      const generated = await generateJsonWithVertex(prompt);
+      const parsedDraft = generated?.parsed?.draft || generated?.parsed;
+      if (parsedDraft && typeof parsedDraft === 'object') {
+        draft = {
+          title: String(parsedDraft?.title || fallbackDraft.title),
+          message: String(parsedDraft?.message || fallbackDraft.message),
+          workPlan: String(parsedDraft?.workPlan || fallbackDraft.workPlan),
+          notes: String(parsedDraft?.notes || fallbackDraft.notes),
+        };
+        source = 'vertex';
+        modelUsed = generated.model;
+      }
+    } catch (genErr: any) {
+      console.warn('Proposal copilot Vertex generation failed; using template draft.', genErr?.message || genErr);
+    }
+
+    const fraudCheck = computeFraudHeuristic({
+      expert: {
+        displayName: actor?.name,
+        skills: actor?.skills,
+        yearsExperience: actor?.experienceYears,
+      },
+      proposal: {
+        title: draft.title,
+        message: draft.message,
+        workPlan: draft.workPlan,
+        amount: preferences?.amount,
+        timeline: preferences?.timeline,
+      },
+      behavior: {
+        externalContactAttempts: keywordSignal(`${draft.message} ${draft.notes}`, ['whatsapp', 'telegram', 'gmail']) > 0 ? 1 : 0,
+      },
+    });
+
+    return res.json({
+      draft,
+      source,
+      modelUsed,
+      fraudCheck: {
+        band: fraudCheck.band,
+        overallRisk: fraudCheck.overallRisk,
+      },
+    });
   } catch (err: any) {
     res.status(getHttpStatusForError(err)).json({ error: err.message, hint: getActionHintForError(err) });
   }

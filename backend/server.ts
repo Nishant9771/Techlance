@@ -6,18 +6,23 @@ import { config as loadEnv } from 'dotenv';
  
 function loadEnvFile() {
 	const candidates = [
+		path.resolve(process.cwd(), 'backend', '.env.local'),
+		path.resolve(process.cwd(), 'backend', '.env'),
 		path.resolve(process.cwd(), '.env.local'),
+		path.resolve(process.cwd(), '.env'),
 		path.resolve(process.cwd(), '..', '.env.local'),
+		path.resolve(process.cwd(), '..', '.env'),
 	];
 
+	let loaded: string | null = null;
 	for (const candidate of candidates) {
 		if (fs.existsSync(candidate)) {
-			loadEnv({ path: candidate });
-			return candidate;
+			loadEnv({ path: candidate, override: false });
+			loaded = loaded || candidate;
 		}
 	}
 
-	return null;
+	return loaded;
 }
 
 function ensureGoogleCredentials() {
@@ -55,12 +60,18 @@ if (!loadedCreds) {
 }
 
 const { default: vertexRouter } = await import('./vertexai');
+const { default: mlRoutes } = await import('./routes/mlRoutes.js');
+const { default: blockchainRoutes } = await import('./routes/blockchain.js');
+const { default: firestoreRoutes } = await import('./routes/firestoreRoutes.js');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 app.use('/api/vertex', vertexRouter);
+app.use('/api', mlRoutes);
+app.use('/api', blockchainRoutes);
+app.use('/api', firestoreRoutes);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

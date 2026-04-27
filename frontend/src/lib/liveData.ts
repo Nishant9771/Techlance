@@ -117,6 +117,50 @@ export async function createProjectPost(
     updatedAt: serverTimestamp(),
   });
 
+  const budgetValue = Number(String(input.budget).replace(/[^\d.]/g, '')) || 0;
+  const timelineValue = Number(input.timeline) || 0;
+  const requiredSkills = input.skills.map((skill) => skill.trim().toLowerCase()).filter(Boolean);
+
+  await setDoc(
+    doc(db, 'projects', ref.id),
+    {
+      ownerId: user.uid,
+      ownerRole: profile?.role || 'user',
+      title: input.title,
+      problemStatement: input.description,
+      description: input.description,
+      fullDetails: input.fullDetails,
+      category: input.category || 'General',
+      budget: {
+        min: budgetValue,
+        max: budgetValue,
+        currency: 'USD',
+      },
+      timelineDays: timelineValue,
+      teamSize: input.whoNeeded === 'Team' ? 4 : 2,
+      status: 'open',
+      requiredSkills,
+      actorNeeded: input.whoNeeded === 'Engineer' || input.whoNeeded === 'Team',
+      supplierNeeded: input.whoNeeded === 'Supplier',
+      innovationScore: 0,
+      noveltyScore: 0,
+      successProbability: 0,
+      fraudRisk: 0,
+      scopeRisk: 0,
+      trustScore: 0,
+      pricingEstimate: null,
+      applicationCount: 0,
+      milestoneCount: 0,
+      ndaRequired: input.requireNda,
+      createdBy: user.uid,
+      authorName: actorName(user, profile),
+      authorEmail: user.email ?? '',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+
   return ref.id;
 }
 

@@ -5,13 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "next dev frontend",
-    "dev:backend": "node --import tsx backend/server.ts",
+    "dev:backend": "node --import tsx backend/server.js",
     "dev:all": "npm run dev:backend & npm run dev",
     "build": "next build frontend",
     "start": "next start frontend",
-    "start:backend": "node --import tsx backend/server.ts",
+    "start:backend": "node --import tsx backend/server.js",
     "clean": "node -e \"require('fs').rmSync('frontend/.next', { recursive: true, force: true })\"",
     "lint": "tsc --noEmit -p frontend/tsconfig.json",
+    "firebase:rules": "firebase deploy --only firestore:rules",
+    "firebase:indexes": "firebase deploy --only firestore:indexes",
+    "seed:firestore": "node --import tsx backend/scripts/seed-firestore.js",
     "ml:export-ranking-data": "node scripts/export-ranking-data.mjs",
     "ml:export-project-success-data": "node scripts/export-project-success-data.mjs"
   },

@@ -2,16 +2,25 @@
   "name": "backend",
   "version": "1.0.0",
   "type": "module",
-  "main": "test.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node test.js",
+    "start": "node --import tsx server.js",
+    "seed:firestore": "node --import tsx scripts/seed-firestore.js",
+    "chain:compile": "hardhat compile",
+    "chain:deploy:trust": "hardhat run scripts/deploy-trust.js --network amoy",
+    "chain:deploy:escrow": "hardhat run scripts/deploy-escrow.js --network amoy",
     "test:embedding": "node test.js",
     "test:novelty": "node novelty.js"
   },
   "dependencies": {
     "@google-cloud/aiplatform": "^3.15.0",
     "dotenv": "^16.4.5",
+    "ethers": "^6.15.0",
     "express": "^4.18.2",
     "google-auth-library": "^9.0.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "hardhat": "^2.28.6"
   }
 }

@@ -3,6 +3,7 @@ import { useNavigate } from '@/lib/router';
 import { useRole } from '../context/RoleContext';
 import { useAuth } from '@/context/AuthContext';
 import { upsertUserProfile, type ProfileDetails, type SerializableProfileValue } from '@/lib/firebaseAuth';
+import { getBlockchainReputation } from '@/lib/blockchainClient';
 import { 
   ArrowLeft, 
   Mail, 
@@ -166,6 +167,7 @@ export default function Profile() {
   const [saveError, setSaveError] = useState('');
   const [profile, setProfile] = useState(initialProfile);
   const [editForm, setEditForm] = useState(initialProfile);
+  const [chainReputation, setChainReputation] = useState<{ trustScore: number; verified: boolean } | null>(null);
 
   useEffect(() => {
     const nextProfile = profileFromFirebase(
@@ -181,6 +183,40 @@ export default function Profile() {
       setEditForm(nextProfile);
     }
   }, [firebaseProfile, isEditing, role, user?.displayName, user?.email]);
+
+  useEffect(() => {
+    const walletAddress =
+      (firebaseProfile?.profileDetails &&
+      typeof firebaseProfile.profileDetails === 'object' &&
+      !Array.isArray(firebaseProfile.profileDetails) &&
+      firebaseProfile.profileDetails.registration &&
+      typeof firebaseProfile.profileDetails.registration === 'object' &&
+      !Array.isArray(firebaseProfile.profileDetails.registration) &&
+      typeof firebaseProfile.profileDetails.registration.walletAddress === 'string'
+        ? firebaseProfile.profileDetails.registration.walletAddress
+        : '') || '';
+
+    if (!walletAddress) {
+      setChainReputation(null);
+      return;
+    }
+
+    let cancelled = false;
+    getBlockchainReputation({ walletAddress }).then((result: any) => {
+      if (!cancelled && !result?.error) {
+        setChainReputation({
+          trustScore: Number(result.trustScore || 0),
+          verified: Boolean(result.verified),
+        });
+      }
+    }).catch(() => {
+      if (!cancelled) setChainReputation(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [firebaseProfile]);
 
   const handleSave = async () => {
     setSaveError('');
@@ -331,6 +367,12 @@ export default function Profile() {
                 <>
                   <h1 className="text-2xl font-bold text-white mb-1">{profile.name}</h1>
                   <p className="text-blue-400 font-medium mb-4 capitalize">{role === 'user' ? profile.role : role}</p>
+                  {chainReputation?.verified ? (
+                    <p className="mb-4 inline-flex items-center gap-1 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">
+                      <Shield className="h-3 w-3" />
+                      Blockchain Verified Reputation ({chainReputation.trustScore})
+                    </p>
+                  ) : null}
                 </>
               )}
 

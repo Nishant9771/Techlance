@@ -19,7 +19,16 @@ import {
 import { InteractionModal } from '../components/InteractionModal';
 import { initialPosts } from '../data/dummyData';
 import { getProjectPost, type LiveProjectPost } from '@/lib/liveData';
-import { getNovelty, matchActors, predictProjectSuccess } from '@/lib/vertexClient';
+import {
+  getNovelty,
+  matchActors,
+  predictProjectSuccess,
+  getReputationScore,
+  getDynamicPricing,
+  predictScopeCreep,
+  getFailureRecovery,
+  getTeamChemistry,
+} from '@/lib/vertexClient';
 
 const fetchPostDetails = async (id: string) => {
   let liveMatch: LiveProjectPost | null = null;
@@ -39,14 +48,18 @@ const fetchPostDetails = async (id: string) => {
       fullDetails: liveMatch.fullDetails,
       requireNda: liveMatch.requireNda,
       budget: liveMatch.budget,
-      timeline: `${liveMatch.timeline} Days`,
+      timeline: String(liveMatch.timeline).toLowerCase().includes('day')
+        ? String(liveMatch.timeline)
+        : `${liveMatch.timeline} Days`,
       category: liveMatch.category,
       author: liveMatch.authorName,
       authorRole: 'Client',
       location: 'Global',
       postedDate: 'Live now',
       skills: liveMatch.skills,
+      whoNeeded: liveMatch.whoNeeded,
       status: liveMatch.status,
+      progress: liveMatch.progress,
       createdBy: liveMatch.createdBy,
     };
   }
@@ -70,6 +83,8 @@ const fetchPostDetails = async (id: string) => {
       postedDate: seedMatch.time,
       skills: [seedMatch.category],
       status: 'Open',
+      whoNeeded: '',
+      progress: 35,
     };
   }
 
@@ -88,7 +103,9 @@ const fetchPostDetails = async (id: string) => {
     location: 'San Francisco, CA (Remote OK)',
     postedDate: 'Oct 24, 2023',
     skills: ['ESP32', 'C++', 'MQTT', 'PCB Design', 'FreeRTOS'],
-    status: 'Open'
+    status: 'Open',
+    whoNeeded: 'Senior IoT Engineer with embedded and firmware expertise',
+    progress: 30,
   };
 };
 
@@ -100,9 +117,32 @@ type ProjectSuccessReason = {
 
 type ProjectSuccessInsight = {
   probability: number;
+  successProbability: number;
+  failureProbability: number;
+  delayRisk: number;
+  delayRiskBand: string;
   band: string;
+  risk: string;
   source: string;
   reasons: ProjectSuccessReason[];
+};
+
+type NoveltyInsight = {
+  novelty: number;
+  noveltyScore: number;
+  innovationScore: number;
+  similarProjectsFound: number;
+};
+
+type MatchingActorInsight = {
+  actorId: string;
+  displayName?: string;
+  finalScore: number;
+  sim?: number;
+  skillsMatch?: number;
+  domainExpertise?: number;
+  availability?: number;
+  pastProjectSuccess?: number;
 };
 
 export default function PostDetails() {
@@ -114,11 +154,23 @@ export default function PostDetails() {
   const [hasSignedNda, setHasSignedNda] = useState(false);
   const [showNdaModal, setShowNdaModal] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
-  const [novelty, setNovelty] = useState<number | null>(null);
+  const [novelty, setNovelty] = useState<NoveltyInsight | null>(null);
   const [topSimilarIdeas, setTopSimilarIdeas] = useState<Array<{ id: string; score: number }>>([]);
-  const [matchingActors, setMatchingActors] = useState<Array<{ actorId: string; finalScore: number; sim?: number }>>([]);
+  const [matchingActors, setMatchingActors] = useState<MatchingActorInsight[]>([]);
+  const [teamChemistry, setTeamChemistry] = useState<Array<{ actorId: string; chemistryScore: number; collaborationFit: number; communicationFit: number }>>([]);
   const [projectSuccess, setProjectSuccess] = useState<ProjectSuccessInsight | null>(null);
+  const [dynamicPricing, setDynamicPricing] = useState<any>(null);
+  const [scopeCreep, setScopeCreep] = useState<any>(null);
+  const [failureRecovery, setFailureRecovery] = useState<any>(null);
+  const [reputation, setReputation] = useState<any>(null);
   const [mlLoading, setMlLoading] = useState(false);
+
+  const parseTimelineDays = (value: string) => {
+    const match = String(value || '').match(/\d+/);
+    if (!match) return 0;
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
 
   useEffect(() => {
     if (id) {
@@ -130,17 +182,93 @@ export default function PostDetails() {
   }, [id]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !post) return;
     setMlLoading(true);
 
     Promise.allSettled([
       getNovelty(String(id)),
-      matchActors({ postId: String(id), topK: 5 }),
-      predictProjectSuccess({ postId: String(id) }),
+      matchActors({
+        postId: String(id),
+        topK: 5,
+        projectSkills: Array.isArray(post.skills) ? post.skills : [],
+        projectCategory: String(post.category || ''),
+      }),
+      getTeamChemistry({
+        postId: String(id),
+        topK: 4,
+        projectSkills: Array.isArray(post.skills) ? post.skills : [],
+        projectCategory: String(post.category || ''),
+        whoNeeded: String(post.whoNeeded || ''),
+      }),
+      predictProjectSuccess({
+        postId: String(id),
+        title: String(post.title || ''),
+        description: String(post.description || ''),
+        fullDetails: String(post.fullDetails || ''),
+        category: String(post.category || ''),
+        budget: String(post.budget || ''),
+        timeline: String(post.timeline || ''),
+        skills: Array.isArray(post.skills) ? post.skills : [],
+        whoNeeded: String(post.whoNeeded || ''),
+        creatorId: String(post.createdBy || ''),
+      }),
+      getDynamicPricing({
+        postId: String(id),
+        title: String(post.title || ''),
+        description: String(post.description || ''),
+        fullDetails: String(post.fullDetails || ''),
+        category: String(post.category || ''),
+        skills: Array.isArray(post.skills) ? post.skills : [],
+        budget: String(post.budget || ''),
+        timeline: String(post.timeline || ''),
+      }),
+      predictScopeCreep({
+        postId: String(id),
+        title: String(post.title || ''),
+        description: String(post.description || ''),
+        fullDetails: String(post.fullDetails || ''),
+        category: String(post.category || ''),
+        skills: Array.isArray(post.skills) ? post.skills : [],
+        timeline: String(post.timeline || ''),
+      }),
+      getFailureRecovery({
+        postId: String(id),
+        progressPercent: Number(post.progress || 35),
+        timelineDays: parseTimelineDays(String(post.timeline || '')),
+        elapsedDays: Math.round(parseTimelineDays(String(post.timeline || '')) * 0.55),
+        changeRequestsCount: 2,
+        stakeholderCount: 3,
+      }),
+      getReputationScore({
+        userId: String(post.createdBy || ''),
+        profile: {
+          displayName: post.author,
+          rating: 4.7,
+          completedProjects: 12,
+          acceptedProjects: 13,
+          onTimeRate: 90,
+          disputeRate: 4,
+          verificationLevel: 92,
+        },
+      }),
     ])
-      .then(([noveltyRes, matchRes, projectSuccessRes]) => {
+      .then(([
+        noveltyRes,
+        matchRes,
+        teamChemistryRes,
+        projectSuccessRes,
+        dynamicPricingRes,
+        scopeCreepRes,
+        failureRecoveryRes,
+        reputationRes,
+      ]) => {
         if (noveltyRes.status === 'fulfilled' && typeof noveltyRes.value?.novelty === 'number') {
-          setNovelty(noveltyRes.value.novelty);
+          setNovelty({
+            novelty: noveltyRes.value.novelty,
+            noveltyScore: Number(noveltyRes.value?.noveltyScore || Math.round(noveltyRes.value.novelty * 100)),
+            innovationScore: Number(noveltyRes.value?.innovationScore || Math.round(noveltyRes.value.novelty * 100)),
+            similarProjectsFound: Number(noveltyRes.value?.similarProjectsFound || 0),
+          });
           if (Array.isArray(noveltyRes.value?.topSimilar)) {
             setTopSimilarIdeas(noveltyRes.value.topSimilar.slice(0, 3));
           }
@@ -148,6 +276,10 @@ export default function PostDetails() {
 
         if (matchRes.status === 'fulfilled' && Array.isArray(matchRes.value?.results)) {
           setMatchingActors(matchRes.value.results);
+        }
+
+        if (teamChemistryRes.status === 'fulfilled' && Array.isArray(teamChemistryRes.value?.results)) {
+          setTeamChemistry(teamChemistryRes.value.results);
         }
 
         if (projectSuccessRes.status === 'fulfilled' && typeof projectSuccessRes.value?.probability === 'number') {
@@ -161,17 +293,38 @@ export default function PostDetails() {
 
           setProjectSuccess({
             probability: projectSuccessRes.value.probability,
+            successProbability: Number(projectSuccessRes.value?.successProbability ?? projectSuccessRes.value.probability),
+            failureProbability: Number(projectSuccessRes.value?.failureProbability ?? (1 - projectSuccessRes.value.probability)),
+            delayRisk: Number(projectSuccessRes.value?.delayRisk ?? 0.4),
+            delayRiskBand: String(projectSuccessRes.value?.delayRiskBand || 'Medium'),
             band: String(projectSuccessRes.value?.band || 'Low'),
+            risk: String(projectSuccessRes.value?.risk || projectSuccessRes.value?.delayRiskBand || 'Medium'),
             source: String(projectSuccessRes.value?.source || 'heuristic'),
             reasons,
           });
+        }
+
+        if (dynamicPricingRes.status === 'fulfilled' && dynamicPricingRes.value && !dynamicPricingRes.value.error) {
+          setDynamicPricing(dynamicPricingRes.value);
+        }
+
+        if (scopeCreepRes.status === 'fulfilled' && scopeCreepRes.value && !scopeCreepRes.value.error) {
+          setScopeCreep(scopeCreepRes.value);
+        }
+
+        if (failureRecoveryRes.status === 'fulfilled' && failureRecoveryRes.value && !failureRecoveryRes.value.error) {
+          setFailureRecovery(failureRecoveryRes.value);
+        }
+
+        if (reputationRes.status === 'fulfilled' && reputationRes.value && !reputationRes.value.error) {
+          setReputation(reputationRes.value);
         }
       })
       .catch((error) => {
         console.warn('Unable to load ML insights for post.', error);
       })
       .finally(() => setMlLoading(false));
-  }, [id]);
+  }, [id, post]);
 
   const handleSave = () => {
     setIsSaved(!isSaved);
@@ -198,6 +351,18 @@ export default function PostDetails() {
   const projectSuccessBandClass = projectSuccess?.band === 'High'
     ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
     : projectSuccess?.band === 'Medium'
+      ? 'border-amber-500/20 bg-amber-500/10 text-amber-200'
+      : 'border-rose-500/20 bg-rose-500/10 text-rose-200';
+
+  const scopeCreepBandClass = scopeCreep?.band === 'Low'
+    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+    : scopeCreep?.band === 'Medium'
+      ? 'border-amber-500/20 bg-amber-500/10 text-amber-200'
+      : 'border-rose-500/20 bg-rose-500/10 text-rose-200';
+
+  const recoveryBandClass = failureRecovery?.band === 'Low'
+    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+    : failureRecovery?.band === 'Medium'
       ? 'border-amber-500/20 bg-amber-500/10 text-amber-200'
       : 'border-rose-500/20 bg-rose-500/10 text-rose-200';
 
@@ -356,6 +521,83 @@ export default function PostDetails() {
               </div>
 
               <div className="bg-[#030303] border border-white/10 rounded-2xl p-6 shadow-inner">
+                <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Dynamic Pricing ML</h3>
+                {mlLoading ? (
+                  <p className="text-sm text-slate-400">Estimating fair budget range...</p>
+                ) : !dynamicPricing ? (
+                  <p className="text-sm text-slate-400">No pricing estimate yet.</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-400 mb-1">Suggested fair budget</p>
+                    <p className="text-2xl font-black text-white mb-2">${Number(dynamicPricing.recommendedBudget || 0).toLocaleString()}</p>
+                    <p className="text-xs text-slate-400 mb-3">
+                      Range: ${Number(dynamicPricing?.suggestedRange?.min || 0).toLocaleString()} - ${Number(dynamicPricing?.suggestedRange?.max || 0).toLocaleString()}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-300">
+                      <p>Demand: <span className="text-white font-bold">{Number(dynamicPricing.marketDemandScore || 0)}%</span></p>
+                      <p>Complexity: <span className="text-white font-bold">{Number(dynamicPricing.complexityScore || 0)}%</span></p>
+                      <p>Urgency: <span className="text-white font-bold">{Number(dynamicPricing.urgencyScore || 0)}%</span></p>
+                      <p>Talent Scarcity: <span className="text-white font-bold">{Number(dynamicPricing.scarceTalentScore || 0)}%</span></p>
+                    </div>
+                    {Array.isArray(dynamicPricing.guidance) && dynamicPricing.guidance.length > 0 && (
+                      <p className="text-[11px] text-orange-200 mt-3">{String(dynamicPricing.guidance[0])}</p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="bg-[#030303] border border-white/10 rounded-2xl p-6 shadow-inner">
+                <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Scope Creep Prediction</h3>
+                {mlLoading ? (
+                  <p className="text-sm text-slate-400">Assessing scope stability...</p>
+                ) : !scopeCreep ? (
+                  <p className="text-sm text-slate-400">No scope risk prediction yet.</p>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-2xl font-black text-white">{Number(scopeCreep.scopeCreepScore || 0)}%</p>
+                        <p className="text-xs text-slate-400 mt-1">Probability of scope expansion risk.</p>
+                      </div>
+                      <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${scopeCreepBandClass}`}>
+                        {scopeCreep.band}
+                      </span>
+                    </div>
+                    {Array.isArray(scopeCreep.mitigations) && scopeCreep.mitigations.length > 0 && (
+                      <p className="text-[11px] text-slate-300">Mitigation: {String(scopeCreep.mitigations[0])}</p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="bg-[#030303] border border-white/10 rounded-2xl p-6 shadow-inner">
+                <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Failure Recovery Recommender</h3>
+                {mlLoading ? (
+                  <p className="text-sm text-slate-400">Checking recovery strategy...</p>
+                ) : !failureRecovery ? (
+                  <p className="text-sm text-slate-400">No recovery recommendation yet.</p>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-xl font-black text-white">{failureRecovery.status === 'struggling' ? 'Struggling' : failureRecovery.status === 'watch' ? 'Watch' : 'Stable'}</p>
+                        <p className="text-xs text-slate-400 mt-1">Recovery risk {(Number(failureRecovery.recoveryRisk || 0) * 100).toFixed(1)}%</p>
+                      </div>
+                      <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${recoveryBandClass}`}>
+                        {failureRecovery.band}
+                      </span>
+                    </div>
+                    {Array.isArray(failureRecovery.recommendations) && failureRecovery.recommendations.length > 0 && (
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                        <p className="text-[11px] text-white font-semibold">{String(failureRecovery.recommendations[0]?.title || 'Recovery action')}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">{String(failureRecovery.recommendations[0]?.why || '')}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="bg-[#030303] border border-white/10 rounded-2xl p-6 shadow-inner">
                 <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Project Success Prediction</h3>
                 {mlLoading ? (
                   <p className="text-sm text-slate-400">Estimating delivery success...</p>
@@ -365,12 +607,25 @@ export default function PostDetails() {
                   <>
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div>
-                        <p className="text-2xl font-black text-white">{(projectSuccess.probability * 100).toFixed(1)}%</p>
+                        <p className="text-2xl font-black text-white">{(projectSuccess.successProbability * 100).toFixed(1)}%</p>
                         <p className="text-xs text-slate-400 font-medium mt-1">Predicted chance this project reaches a strong completion outcome.</p>
                       </div>
                       <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${projectSuccessBandClass}`}>
                         {projectSuccess.band}
                       </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Delay Risk</p>
+                        <p className="text-sm font-bold text-amber-200">{(projectSuccess.delayRisk * 100).toFixed(1)}%</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{projectSuccess.delayRiskBand}</p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Failure Probability</p>
+                        <p className="text-sm font-bold text-rose-200">{(projectSuccess.failureProbability * 100).toFixed(1)}%</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Risk: {projectSuccess.risk}</p>
+                      </div>
                     </div>
 
                     {projectSuccess.reasons.length > 0 && (
@@ -407,8 +662,17 @@ export default function PostDetails() {
                   <p className="text-sm text-slate-400">No novelty score yet. It appears after embedding sync.</p>
                 ) : (
                   <>
-                    <p className="text-2xl font-black text-white mb-2">Novelty: {(novelty * 100).toFixed(1)}%</p>
-                    <p className="text-xs text-slate-400 font-medium">Higher means your idea is more distinct from existing projects.</p>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Innovation Score</p>
+                        <p className="text-sm font-bold text-emerald-200">{novelty.innovationScore}%</p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Novelty Score</p>
+                        <p className="text-sm font-bold text-white">{novelty.noveltyScore}%</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400 font-medium">Similar Projects Found: <span className="text-orange-300 font-bold">{novelty.similarProjectsFound}</span></p>
                     {topSimilarIdeas.length > 0 && (
                       <div className="mt-4 space-y-2">
                         <p className="text-[11px] uppercase tracking-wide text-slate-500 font-bold">Most Similar Existing Ideas</p>
@@ -433,12 +697,42 @@ export default function PostDetails() {
                 ) : (
                   <div className="space-y-2">
                     {matchingActors.map((actor, idx) => (
-                      <div key={actor.actorId} className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
+                      <div key={actor.actorId} className="rounded-lg border border-white/10 px-3 py-2">
                         <div>
-                          <p className="text-sm text-white font-semibold">#{idx + 1} {actor.actorId}</p>
-                          <p className="text-[11px] text-slate-400">Similarity {(Number(actor.sim || 0) * 100).toFixed(1)}%</p>
+                          <p className="text-sm text-white font-semibold">#{idx + 1} {actor.displayName || actor.actorId}</p>
+                          <p className="text-[11px] text-slate-400">Semantic Similarity {(Number(actor.sim || 0) * 100).toFixed(1)}%</p>
                         </div>
-                        <p className="text-sm text-emerald-400 font-bold">Score {(Number(actor.finalScore || 0) * 100).toFixed(1)}%</p>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
+                          <p className="text-slate-300">Skills: <span className="text-white font-bold">{Math.round(Number(actor.skillsMatch || 0))}%</span></p>
+                          <p className="text-slate-300">Domain: <span className="text-white font-bold">{Math.round(Number(actor.domainExpertise || 0))}%</span></p>
+                          <p className="text-slate-300">Availability: <span className="text-white font-bold">{Math.round(Number(actor.availability || 0))}%</span></p>
+                          <p className="text-slate-300">Past Success: <span className="text-white font-bold">{Math.round(Number(actor.pastProjectSuccess || 0))}%</span></p>
+                        </div>
+                        <p className="text-sm text-emerald-400 font-bold mt-2">Score {(Number(actor.finalScore || 0) * 100).toFixed(1)}%</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-[#030303] border border-white/10 rounded-2xl p-6 shadow-inner">
+                <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Team Chemistry Matching</h3>
+                {mlLoading ? (
+                  <p className="text-sm text-slate-400">Computing chemistry fit...</p>
+                ) : teamChemistry.length === 0 ? (
+                  <p className="text-sm text-slate-400">No chemistry insights yet. More actor profiles improve this score.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {teamChemistry.map((entry, idx) => (
+                      <div key={`${entry.actorId}-${idx}`} className="rounded-lg border border-white/10 px-3 py-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-white font-semibold">#{idx + 1} {entry.actorId}</p>
+                          <p className="text-sm text-emerald-300 font-bold">{entry.chemistryScore}%</p>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-300">
+                          <p>Collaboration: <span className="text-white font-bold">{entry.collaborationFit}%</span></p>
+                          <p>Communication: <span className="text-white font-bold">{entry.communicationFit}%</span></p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -463,8 +757,12 @@ export default function PostDetails() {
                      <ShieldCheck className="w-4 h-4" />
                    </div>
                    <div>
-                     <p className="text-xs font-bold text-emerald-500 uppercase tracking-wide mb-0.5">Trust Score: 98/100</p>
-                     <p className="text-[10px] text-emerald-400/80 font-medium">Verified Payment History</p>
+                     <p className="text-xs font-bold text-emerald-500 uppercase tracking-wide mb-0.5">
+                       Trust Score: {Number(reputation?.trustScore || 0)}/100
+                     </p>
+                     <p className="text-[10px] text-emerald-400/80 font-medium">
+                       Reliability {Number(reputation?.reliabilityScore || 0)} | Delivery {Number(reputation?.deliveryScore || 0)}
+                     </p>
                    </div>
                 </div>
 

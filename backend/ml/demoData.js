@@ -1,0 +1,111 @@
+export const demoIdeas = [
+  {
+    id: 'idea_smart_irrigation',
+    title: 'AI Smart Irrigation',
+    description: 'IoT moisture sensors and predictive watering automation for urban farms.',
+    domain: 'agritech',
+  },
+  {
+    id: 'idea_drone_inspection',
+    title: 'Autonomous Drone Inspection',
+    description: 'Computer vision drones inspecting industrial assets for defects and heat leaks.',
+    domain: 'robotics',
+  },
+  {
+    id: 'idea_energy_router',
+    title: 'Microgrid Energy Router',
+    description: 'Edge controller balancing solar, battery, and EV charging in real time.',
+    domain: 'energy',
+  },
+];
+
+export const demoActors = [
+  {
+    id: 'actor_mia',
+    name: 'Mia Patel',
+    skills: ['iot', 'firmware', 'embedded c', 'pcb'],
+    rating: 4.8,
+    experience: 7,
+    domains: ['agritech', 'energy', 'hardware'],
+    availability: 0.7,
+    completedProjects: 32,
+    onTimeRate: 0.84,
+    disputeRate: 0.05,
+  },
+  {
+    id: 'actor_ryan',
+    name: 'Ryan Chen',
+    skills: ['computer vision', 'python', 'mlops', 'cloud'],
+    rating: 4.7,
+    experience: 6,
+    domains: ['robotics', 'ai', 'manufacturing'],
+    availability: 0.5,
+    completedProjects: 27,
+    onTimeRate: 0.79,
+    disputeRate: 0.08,
+  },
+  {
+    id: 'actor_sana',
+    name: 'Sana Ibrahim',
+    skills: ['react', 'node.js', 'firebase', 'api design'],
+    rating: 4.9,
+    experience: 8,
+    domains: ['saas', 'fintech', 'ai'],
+    availability: 0.65,
+    completedProjects: 41,
+    onTimeRate: 0.9,
+    disputeRate: 0.03,
+  },
+  {
+    id: 'actor_diego',
+    name: 'Diego Martins',
+    skills: ['mechanical design', 'cad', 'simulation'],
+    rating: 4.5,
+    experience: 5,
+    domains: ['robotics', 'hardware', 'mobility'],
+    availability: 0.8,
+    completedProjects: 18,
+    onTimeRate: 0.76,
+    disputeRate: 0.1,
+  },
+];
+
+export const demoProjects = [
+  {
+    id: 'project_hydrokit',
+    title: 'Hydroponics Automation Kit',
+    description: 'Automate nutrient dosing, lighting, and humidity control using IoT nodes.',
+    category: 'agritech',
+    skills: ['iot', 'firmware', 'dashboard'],
+    budget: 12000,
+    timelineDays: 65,
+    teamSize: 3,
+  },
+  {
+    id: 'project_smartmeter',
+    title: 'Edge Smart Meter Analytics',
+    description: 'Detect usage anomalies on energy meters with lightweight ML inference.',
+    category: 'energy',
+    skills: ['embedded', 'python', 'mlops'],
+    budget: 18000,
+    timelineDays: 90,
+    teamSize: 4,
+  },
+  {
+    id: 'project_fleetvision',
+    title: 'Fleet Defect Vision Pipeline',
+    description: 'Classify equipment defects from inspection video streams.',
+    category: 'robotics',
+    skills: ['computer vision', 'cloud', 'api'],
+    budget: 26000,
+    timelineDays: 110,
+    teamSize: 5,
+  },
+];
+
+export const demoReputationScores = [
+  { id: 'actor_mia', trustScore: 86, reliabilityScore: 84 },
+  { id: 'actor_ryan', trustScore: 81, reliabilityScore: 79 },
+  { id: 'actor_sana', trustScore: 92, reliabilityScore: 90 },
+  { id: 'actor_diego', trustScore: 74, reliabilityScore: 73 },
+];

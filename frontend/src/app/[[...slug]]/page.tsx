@@ -20,6 +20,8 @@ import Messages from '@/views/Messages';
 import Settings from '@/views/Settings';
 import Shop from '@/views/Shop';
 import Orders from '@/views/Orders';
+import ProjectIntelligence from '@/views/ProjectIntelligence';
+import BlockchainTrustDashboard from '@/views/BlockchainTrustDashboard';
 
 const POST_ROUTE = /^\/post\/[^/]+$/;
 const CONTRACT_ROUTE = /^\/contract\/[^/]+$/;
@@ -55,6 +57,8 @@ function isKnownPath(pathname: string) {
     pathname === '/messages' ||
     pathname === '/settings' ||
     pathname === '/shop' ||
+    pathname === '/project-intelligence' ||
+    pathname === '/blockchain-trust' ||
     pathname === '/supplier/orders' ||
     POST_ROUTE.test(pathname) ||
     CONTRACT_ROUTE.test(pathname) ||
@@ -73,6 +77,8 @@ function renderPath(pathname: string) {
   if (pathname === '/messages') return <Messages />;
   if (pathname === '/settings') return <Settings />;
   if (pathname === '/shop') return <Shop />;
+  if (pathname === '/project-intelligence') return <ProjectIntelligence />;
+  if (pathname === '/blockchain-trust') return <BlockchainTrustDashboard />;
   if (pathname === '/supplier/orders') return <Orders />;
   if (POST_ROUTE.test(pathname)) return <PostDetails />;
   if (CONTRACT_ROUTE.test(pathname)) return <Contract />;
