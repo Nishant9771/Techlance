@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from '@/lib/router';
+import { getSmartImage } from '@/utils/assetManager';
 import { useRole } from '../context/RoleContext';
 import { useAuth } from '@/context/AuthContext';
 import { subscribeMyProjects, updateProjectProgress, type LiveProjectPost } from '@/lib/liveData';
@@ -202,7 +203,7 @@ export default function Projects() {
                       {/* Actor Info */}
                       <p className="text-sm text-slate-400 mb-6 flex items-center gap-2">
                         <span className="w-6 h-6 rounded-full bg-slate-800 overflow-hidden inline-block">
-                          <img src={`https://picsum.photos/seed/${project.actor.replace(' ', '')}/50/50`} alt={project.actor} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={getSmartImage("projects")} alt={project.actor} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         </span>
                         Contractor: <span className="text-slate-200 font-medium">{project.actor}</span>
                       </p>

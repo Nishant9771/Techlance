@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from '@/lib/router';
 import { useRole } from '../context/RoleContext';
 import { useAuth } from '@/context/AuthContext';
+import { getSmartImage } from '@/utils/assetManager';
 import { setOfferStatus, subscribeOffers, type LiveOffer } from '@/lib/liveData';
 import { detectFraud } from '@/lib/vertexClient';
 import { 
@@ -309,7 +310,7 @@ export default function Offers() {
                     {/* Left Column: Actor Info */}
                     <div className="flex-shrink-0 flex flex-row lg:flex-col items-center lg:items-start gap-4 lg:w-48">
                       <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-white/10 overflow-hidden flex-shrink-0">
-                        <img src={offer.avatar} alt={offer.actorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img src={getSmartImage("profiles")} alt={offer.actorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-white text-lg">{offer.actorName}</h3>

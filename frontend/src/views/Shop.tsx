@@ -26,12 +26,22 @@ import { TechBackground } from '../components/TechBackground';
 import { products, suggestedProjects, supplierAds } from '../data/dummyData';
 import { useRole } from '../context/RoleContext';
 import { useAuth } from '@/context/AuthContext';
+import { getSmartImage, getNextIndex } from '@/utils/assetManager';
 import { createProduct, deleteProduct, subscribeProducts } from '@/lib/liveData';
 
 export default function Shop() {
   const navigate = useNavigate();
   const { role } = useRole();
   const { user, profile } = useAuth();
+  const [imgIndex, setImgIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setImgIndex((prev) => getNextIndex(prev, 10));
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
   const [activeMenu, setActiveMenu] = useState('Shop');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -244,9 +254,9 @@ export default function Shop() {
                 <div>
                   <h2 className="text-lg font-bold text-white mb-4">Your Products</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {supplierProductList.map(p => (
+                    {supplierProductList.map((p, i) => (
                       <div key={p.id} className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 flex gap-4">
-                        <img src={p.image} alt={p.name} className="w-20 h-20 rounded-lg object-cover" />
+                        <img src={getSmartImage("shop", imgIndex + i)} alt={p.name} className="w-20 h-20 rounded-lg object-cover" />
                         <div className="flex-1">
                           <h3 className="text-sm font-bold text-white line-clamp-1">{p.name}</h3>
                           <p className="text-blue-400 font-medium text-sm mt-1">${p.price}</p>
@@ -363,10 +373,10 @@ export default function Shop() {
               {/* PRODUCT GRID */}
               <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {filteredProducts.map(product => (
+                  {filteredProducts.map((product, i) => (
                     <div key={product.id} className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden hover:border-blue-500/30 transition-all group flex flex-col">
                       <div className="relative aspect-[4/3] overflow-hidden bg-slate-800">
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <img src={getSmartImage("shop", imgIndex + i)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                         {product.badge && (
                           <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider">
                             {product.badge}
@@ -417,9 +427,9 @@ export default function Shop() {
                   <div>
                     <h3 className="text-sm font-bold text-white mb-4">Recommended For You</h3>
                     <div className="space-y-3">
-                      {allProducts.slice(0, 3).map(p => (
+                      {allProducts.slice(0, 3).map((p, i) => (
                         <div key={p.id} className="flex gap-3 items-center p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-colors" onClick={() => setSelectedProduct(p)}>
-                          <img src={p.image} className="w-12 h-12 rounded-lg object-cover" />
+                          <img src={getSmartImage("shop", imgIndex + i)} className="w-12 h-12 rounded-lg object-cover" />
                           <div>
                             <h4 className="text-xs font-bold text-white line-clamp-1">{p.name}</h4>
                             <p className="text-blue-400 text-xs font-medium">${p.price}</p>
@@ -494,7 +504,7 @@ export default function Shop() {
                 ) : (
                   cart.map((item, i) => (
                     <div key={i} className="flex gap-4 bg-slate-800/50 p-3 rounded-xl border border-white/5">
-                      <img src={item.image} className="w-16 h-16 rounded-lg object-cover" />
+                      <img src={getSmartImage("shop", imgIndex)} className="w-16 h-16 rounded-lg object-cover" />
                       <div className="flex-1">
                         <h4 className="text-sm font-bold text-white line-clamp-1">{item.name}</h4>
                         <p className="text-xs text-slate-400">{item.supplier}</p>
@@ -573,7 +583,7 @@ export default function Shop() {
               </button>
               
               <div className="w-full md:w-1/2 bg-slate-800 relative">
-                <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover min-h-[300px]" />
+                <img src={getSmartImage("shop", imgIndex)} alt={selectedProduct.name} className="w-full h-full object-cover min-h-[300px]" />
               </div>
               
               <div className="w-full md:w-1/2 p-8 overflow-y-auto flex flex-col">

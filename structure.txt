@@ -1,0 +1,341 @@
+Folder PATH listing for volume Windows
+Volume serial number is 749E-50E7
+C:.
+|   .env.local
+|   .gitignore
+|   LICENSE
+|   metadata.json
+|   package-lock.json
+|   package.json
+|   README.md
+|   structure.txt
+|   tsconfig.json
+|   
++---.sixth
+|   \---skills
++---backend
+|       embeddings.js
+|       firebaseAdmin.ts
+|       novelty.js
+|       package-lock.json
+|       package.json
+|       server.ts
+|       test.js
+|       vertex-key.json
+|       vertexai.ts
+|       
++---frontend
+|   |   next-env.d.ts
+|   |   next.config.ts
+|   |   postcss.config.mjs
+|   |   tsconfig.json
+|   |   tsconfig.tsbuildinfo
+|   |   
+|   +---.next
+|   |   |   app-build-manifest.json
+|   |   |   build-manifest.json
+|   |   |   package.json
+|   |   |   prerender-manifest.json
+|   |   |   react-loadable-manifest.json
+|   |   |   routes-manifest.json
+|   |   |   trace
+|   |   |   
+|   |   +---cache
+|   |   |   |   .previewinfo
+|   |   |   |   .rscinfo
+|   |   |   |   next-devtools-config.json
+|   |   |   |   
+|   |   |   \---webpack
+|   |   |       +---client-development
+|   |   |       |       0.pack.gz
+|   |   |       |       1.pack.gz
+|   |   |       |       10.pack.gz
+|   |   |       |       11.pack.gz
+|   |   |       |       2.pack.gz
+|   |   |       |       3.pack.gz
+|   |   |       |       4.pack.gz
+|   |   |       |       5.pack.gz
+|   |   |       |       6.pack.gz
+|   |   |       |       7.pack.gz
+|   |   |       |       8.pack.gz
+|   |   |       |       9.pack.gz
+|   |   |       |       index.pack.gz
+|   |   |       |       index.pack.gz.old
+|   |   |       |       
+|   |   |       +---client-development-fallback
+|   |   |       |       0.pack.gz
+|   |   |       |       index.pack.gz
+|   |   |       |       
+|   |   |       +---client-production
+|   |   |       |       0.pack
+|   |   |       |       1.pack
+|   |   |       |       10.pack
+|   |   |       |       2.pack
+|   |   |       |       3.pack
+|   |   |       |       4.pack
+|   |   |       |       5.pack
+|   |   |       |       6.pack
+|   |   |       |       7.pack
+|   |   |       |       8.pack
+|   |   |       |       9.pack
+|   |   |       |       index.pack
+|   |   |       |       index.pack.old
+|   |   |       |       
+|   |   |       +---edge-server-production
+|   |   |       |       0.pack
+|   |   |       |       index.pack
+|   |   |       |       
+|   |   |       +---server-development
+|   |   |       |       0.pack.gz
+|   |   |       |       1.pack.gz
+|   |   |       |       2.pack.gz
+|   |   |       |       3.pack.gz
+|   |   |       |       4.pack.gz
+|   |   |       |       5.pack.gz
+|   |   |       |       6.pack.gz
+|   |   |       |       7.pack.gz
+|   |   |       |       8.pack.gz
+|   |   |       |       9.pack.gz
+|   |   |       |       index.pack.gz
+|   |   |       |       index.pack.gz.old
+|   |   |       |       
+|   |   |       \---server-production
+|   |   |               0.pack
+|   |   |               1.pack
+|   |   |               2.pack
+|   |   |               3.pack
+|   |   |               4.pack
+|   |   |               5.pack
+|   |   |               6.pack
+|   |   |               7.pack
+|   |   |               8.pack
+|   |   |               9.pack
+|   |   |               index.pack
+|   |   |               index.pack.old
+|   |   |               
+|   |   +---server
+|   |   |   |   app-paths-manifest.json
+|   |   |   |   interception-route-rewrite-manifest.js
+|   |   |   |   middleware-build-manifest.js
+|   |   |   |   middleware-manifest.json
+|   |   |   |   middleware-react-loadable-manifest.js
+|   |   |   |   next-font-manifest.js
+|   |   |   |   next-font-manifest.json
+|   |   |   |   pages-manifest.json
+|   |   |   |   server-reference-manifest.js
+|   |   |   |   server-reference-manifest.json
+|   |   |   |   webpack-runtime.js
+|   |   |   |   
+|   |   |   +---app
+|   |   |   |   \---[[...slug]]
+|   |   |   |           page.js
+|   |   |   |           page_client-reference-manifest.js
+|   |   |   |           
+|   |   |   \---vendor-chunks
+|   |   |           @firebase.js
+|   |   |           @grpc.js
+|   |   |           @protobufjs.js
+|   |   |           @swc.js
+|   |   |           firebase.js
+|   |   |           framer-motion.js
+|   |   |           idb.js
+|   |   |           lodash.camelcase.js
+|   |   |           long.js
+|   |   |           lucide-react.js
+|   |   |           motion-dom.js
+|   |   |           motion-utils.js
+|   |   |           next.js
+|   |   |           protobufjs.js
+|   |   |           tslib.js
+|   |   |           
+|   |   +---static
+|   |   |   +---chunks
+|   |   |   |   |   app-pages-internals.js
+|   |   |   |   |   main-app.js
+|   |   |   |   |   polyfills.js
+|   |   |   |   |   webpack.js
+|   |   |   |   |   _app-pages-browser_node_modules_next_dist_client_dev_noop-turbopack-hmr_js.js
+|   |   |   |   |   
+|   |   |   |   \---app
+|   |   |   |       |   layout.js
+|   |   |   |       |   
+|   |   |   |       \---[[...slug]]
+|   |   |   |               page.js
+|   |   |   |               
+|   |   |   +---css
+|   |   |   |   \---app
+|   |   |   |           layout.css
+|   |   |   |           
+|   |   |   +---development
+|   |   |   |       _buildManifest.js
+|   |   |   |       _ssgManifest.js
+|   |   |   |       
+|   |   |   \---webpack
+|   |   |           633457081244afec._.hot-update.json
+|   |   |           
+|   |   \---types
+|   |       |   cache-life.d.ts
+|   |       |   package.json
+|   |       |   routes.d.ts
+|   |       |   validator.ts
+|   |       |   
+|   |       \---app
+|   |           |   layout.ts
+|   |           |   
+|   |           \---[[...slug]]
+|   |                   page.ts
+|   |                   
+|   \---src
+|       +---app
+|       |   |   globals.css
+|       |   |   layout.tsx
+|       |   |   
+|       |   \---[[...slug]]
+|       |           page.tsx
+|       |           
+|       +---assets
+|       |   +---assets
+|       |   |   \---images
+|       |   |       +---circuits
+|       |   |       |       moe-salih-Y8V5XuDlbH4-unsplash.jpg
+|       |   |       |       nicolas-thomas-3GZi6OpSDcY-unsplash.jpg
+|       |   |       |       
+|       |   |       +---cuts
+|       |   |       |       moe-salih-Y8V5XuDlbH4-unsplash.jpg
+|       |   |       |       
+|       |   |       +---profiles
+|       |   |       |       moe-salih-Y8V5XuDlbH4-unsplash.jpg
+|       |   |       |       
+|       |   |       +---projects
+|       |   |       |       moe-salih-Y8V5XuDlbH4-unsplash (1).jpg
+|       |   |       |       pexels-cottonbro-4709377.jpg
+|       |   |       |       
+|       |   |       +---shop
+|       |   |       |   +---boards
+|       |   |       |   |       download (24).jpg
+|       |   |       |   |       download (31).jpg
+|       |   |       |   |       download (32).jpg
+|       |   |       |   |       download (33).jpg
+|       |   |       |   |       download (38).jpg
+|       |   |       |   |       download (41).jpg
+|       |   |       |   |       download (42).jpg
+|       |   |       |   |       download (43).jpg
+|       |   |       |   |       download (54).jpg
+|       |   |       |   |       download (55).jpg
+|       |   |       |   |       download (56).jpg
+|       |   |       |   |       download (57).jpg
+|       |   |       |   |       images (13).jpg
+|       |   |       |   |       images (18).jpg
+|       |   |       |   |       images (19).jpg
+|       |   |       |   |       
+|       |   |       |   +---components
+|       |   |       |   |       download (10).jpg
+|       |   |       |   |       download (11).jpg
+|       |   |       |   |       download (16).jpg
+|       |   |       |   |       download (17).jpg
+|       |   |       |   |       download (18).jpg
+|       |   |       |   |       download (6).jpg
+|       |   |       |   |       download (7).jpg
+|       |   |       |   |       download (8).jpg
+|       |   |       |   |       download (9).jpg
+|       |   |       |   |       download.jpg
+|       |   |       |   |       images (2).jpg
+|       |   |       |   |       images (3).jpg
+|       |   |       |   |       images (4).jpg
+|       |   |       |   |       images (5).jpg
+|       |   |       |   |       images (6).jpg
+|       |   |       |   |       images (7).jpg
+|       |   |       |   |       images (8).jpg
+|       |   |       |   |       images.jpg
+|       |   |       |   |       
+|       |   |       |   +---kits
+|       |   |       |   |       download (44).jpg
+|       |   |       |   |       download (45).jpg
+|       |   |       |   |       download (46).jpg
+|       |   |       |   |       download (47).jpg
+|       |   |       |   |       download (48).jpg
+|       |   |       |   |       download (49).jpg
+|       |   |       |   |       download (50).jpg
+|       |   |       |   |       download (51).jpg
+|       |   |       |   |       download (52).jpg
+|       |   |       |   |       download (53).jpg
+|       |   |       |   |       images (14).jpg
+|       |   |       |   |       images (15).jpg
+|       |   |       |   |       images (16).jpg
+|       |   |       |   |       images (17).jpg
+|       |   |       |   |       
+|       |   |       |   \---sensors
+|       |   |       |           download (12).jpg
+|       |   |       |           download (13).jpg
+|       |   |       |           download (37).jpg
+|       |   |       |           download (38).jpg
+|       |   |       |           download (39).jpg
+|       |   |       |           download (40).jpg
+|       |   |       |           images (11).jpg
+|       |   |       |           images (12).jpg
+|       |   |       |           
+|       |   |       \---ui
+|       |   |               moe-salih-Y8V5XuDlbH4-unsplash (1).jpg
+|       |   |               pexels-cottonbro-4709377.jpg
+|       |   |               
+|       |   \---images
+|       |       +---circuits
+|       |       |       moe-salih-Y8V5XuDlbH4-unsplash.jpg
+|       |       |       
+|       |       +---cuts
+|       |       |       moe-salih-Y8V5XuDlbH4-unsplash.jpg
+|       |       |       
+|       |       +---profiles
+|       |       |       moe-salih-Y8V5XuDlbH4-unsplash.jpg
+|       |       |       
+|       |       +---projects
+|       |       |       moe-salih-Y8V5XuDlbH4-unsplash (1).jpg
+|       |       |       pexels-cottonbro-4709377.jpg
+|       |       |       
+|       |       \---ui
+|       |               pexels-cottonbro-4709377.jpg
+|       |               
+|       +---components
+|       |       CutPlayer.tsx
+|       |       InteractionModal.tsx
+|       |       LegalContent.tsx
+|       |       TechBackground.tsx
+|       |       
+|       +---context
+|       |       AuthContext.tsx
+|       |       RoleContext.tsx
+|       |       
+|       +---data
+|       |       dummyData.ts
+|       |       
+|       +---lib
+|       |       firebase.ts
+|       |       firebaseAuth.ts
+|       |       liveData.ts
+|       |       router.tsx
+|       |       vertexClient.ts
+|       |       
+|       \---views
+|               ActorDashboard.tsx
+|               Contract.tsx
+|               CreateProject.tsx
+|               Messages.tsx
+|               Offers.tsx
+|               Onboarding.tsx
+|               Orders.tsx
+|               PostDetails.tsx
+|               Profile.tsx
+|               Projects.tsx
+|               Settings.tsx
+|               Shop.tsx
+|               SignIn.tsx
+|               SupplierDashboard.tsx
+|               UserDashboard.tsx
+|               Workspace.tsx
+|               
+\---scripts
+        export-project-success-data.mjs
+        export-ranking-data.mjs
+        train-project-success-model.md
+        train-ranking-model.md
+        

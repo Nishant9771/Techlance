@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from 'express';
 import {GoogleAuth} from 'google-auth-library';
-import { adminDb } from './firebaseAdmin';
+import { adminDb } from './firebaseAdmin.ts';
 
 const router = express.Router();
 

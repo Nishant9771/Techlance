@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from '@/lib/router';
+import { getSmartImage } from '@/utils/assetManager';
 import { ArrowLeft, MessageSquare, Search } from 'lucide-react';
 import { TechBackground } from '../components/TechBackground';
 import { useAuth } from '@/context/AuthContext';
@@ -66,7 +67,7 @@ export default function Messages() {
               {[1].map((i) => (
                 <div key={i} className="p-3 rounded-xl bg-white/5 cursor-pointer transition-colors flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex-shrink-0">
-                    <img src={`https://picsum.photos/seed/chat${i}/100/100`} alt="User" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={getSmartImage("profiles")} alt="User" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex justify-between items-baseline">

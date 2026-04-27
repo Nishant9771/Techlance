@@ -79,9 +79,19 @@ const Field = ({ label, children, required = true }: any) => (
   </div>
 );
 
-const Input = ({ type = 'text', className = '', ...props }: any) => (
-  <input type={type} required {...props} className={`w-full bg-[#030303] border border-white/10 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#FF6A00] hover:border-white/20 transition-all placeholder:text-slate-600 ${className}`} />
-);
+const Input = ({ type = 'text', className = '', ...props }: any) => {
+  const isControlled = props.value !== undefined;
+
+  return (
+    <input
+      type={type}
+      required
+      {...props}
+      {...(isControlled ? { value: props.value } : {})}
+      className={`w-full bg-[#030303] border border-white/10 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#FF6A00] hover:border-white/20 transition-all placeholder:text-slate-600 ${className}`}
+    />
+  );
+};
 
 const Select = ({ options, required = true, ...props }: any) => (
   <div className="relative w-full">

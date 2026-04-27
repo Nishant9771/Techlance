@@ -3,7 +3,11 @@ import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import { config as loadEnv } from 'dotenv';
- 
+
+// AI imports
+import { runAI } from './ai/ai_role3/ai/index.ts';
+import { runAI2 } from './ai/ai_role2/index.ts';
+
 function loadEnvFile() {
 	const candidates = [
 		path.resolve(process.cwd(), 'backend', '.env.local'),
@@ -15,6 +19,7 @@ function loadEnvFile() {
 	];
 
 	let loaded: string | null = null;
+
 	for (const candidate of candidates) {
 		if (fs.existsSync(candidate)) {
 			loadEnv({ path: candidate, override: false });
@@ -50,16 +55,15 @@ const loadedEnv = loadEnvFile();
 const loadedCreds = ensureGoogleCredentials();
 
 if (!loadedEnv) {
-	// eslint-disable-next-line no-console
 	console.warn('No .env.local found. Checked current and parent directories.');
 }
 
 if (!loadedCreds) {
-	// eslint-disable-next-line no-console
 	console.warn('No Google credentials found. Set GOOGLE_APPLICATION_CREDENTIALS or add backend/vertex-key.json.');
 }
 
-const { default: vertexRouter } = await import('./vertexai');
+// ✅ IMPORT ROUTES (ONLY ONCE)
+const { default: vertexRouter } = await import('./vertexai.ts');
 const { default: mlRoutes } = await import('./routes/mlRoutes.js');
 const { default: blockchainRoutes } = await import('./routes/blockchain.js');
 const { default: firestoreRoutes } = await import('./routes/firestoreRoutes.js');
@@ -68,13 +72,34 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// EXISTING ROUTES
 app.use('/api/vertex', vertexRouter);
 app.use('/api', mlRoutes);
 app.use('/api', blockchainRoutes);
 app.use('/api', firestoreRoutes);
 
-const PORT = process.env.PORT || 3001;
+// AI ROUTES
+app.post('/api/ai/run', async (req, res) => {
+	try {
+		const result = await runAI(req.body);
+		res.json(result);
+	} catch (error) {
+		console.error('AI ERROR:', error);
+		res.status(500).json({ error: 'AI processing failed' });
+	}
+});
+
+app.post('/api/ai2/run', async (req, res) => {
+	try {
+		const result = await runAI2(req.body);
+		res.json(result);
+	} catch (error) {
+		console.error('AI2 ERROR:', error);
+		res.status(500).json({ error: 'AI2 processing failed' });
+	}
+});
+
+const PORT = 3002;
 app.listen(PORT, () => {
-	// eslint-disable-next-line no-console
-	console.log(`Backend listening on ${PORT}`);
+	console.log('Backend running on port', PORT);
 });
