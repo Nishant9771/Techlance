@@ -94,11 +94,76 @@ export default function CreateProject() {
     setIsSubmitting(true);
 
     try {
+      console.log("STEP 1: START");
       if (!user) {
         setError('Please sign in before creating a project.');
         setIsSubmitting(false);
         return;
       }
+
+      let aiData: any = null;
+      let ai2Data: any = null;
+
+      try {
+        const aiPayload = {
+          ideaText: fullDetails || basicDescription,
+          actorAccepted: !requireNda,
+          cancellations: 1,
+          disputes: 0,
+          completion_rate: 0.8,
+          message_repeat: 0,
+          existingIdeas: [],
+        };
+
+        const aiRes = await fetch("http://localhost:3001/api/ai/run", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(aiPayload),
+        });
+
+        if (aiRes.ok) {
+          aiData = await aiRes.json();
+          console.log("STEP 2: AI1 DONE", aiData);
+          console.log("STEP 2: AI1 DONE");
+        } else {
+          console.warn("AI1 failed", { status: aiRes.status });
+        }
+      } catch (e) {
+        console.warn("AI1 failed", e);
+      }
+
+      if (aiData?.nda?.requiresNDA) {
+        setRequireNda(true);
+      }
+
+      try {
+        const ai2Res = await fetch("http://localhost:3002/api/ai2/run", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ideaText: fullDetails,
+            budget,
+            timeline,
+            skills,
+          }),
+        });
+
+        if (ai2Res.ok) {
+          ai2Data = await ai2Res.json();
+          console.log("STEP 3: AI2 DONE", ai2Data);
+          console.log("STEP 3: AI2 DONE");
+        } else {
+          console.warn("AI2 failed", { status: ai2Res.status });
+        }
+      } catch (e) {
+        console.warn("AI2 failed", e);
+      }
+
+      console.log("STEP 4: BEFORE CREATE PROJECT");
 
       const projectId = await createProjectPost(
         {
@@ -112,10 +177,21 @@ export default function CreateProject() {
           skills,
           requireNda,
           files: uploadedFiles,
+          ...(aiData?.nda || ai2Data?.risk || ai2Data?.progress
+            ? {
+                aiAnalysis: {
+                  risk: ai2Data?.risk ?? null,
+                  progress: ai2Data?.progress ?? null,
+                  nda: aiData?.nda ?? null,
+                },
+              }
+            : {}),
         },
         user,
         profile,
       );
+      console.log("STEP 5: PROJECT CREATED", projectId);
+      console.log("STEP 5: PROJECT CREATED");
 
       const embeddingText = [
         title,
@@ -177,7 +253,13 @@ export default function CreateProject() {
       setIsSubmitting(false);
 
     } catch (err) {
-      setError('Failed to create project. Please try again.');
+      const message = err instanceof Error ? err.message : '';
+      if (message.toLowerCase().includes('permission')) {
+        setError('Failed to create project due to permissions. Please sign in again and retry.');
+      } else {
+        setError('Failed to create project. Please try again.');
+      }
+      console.error('Create project failed:', err);
       setInsightsLoading(false);
       setIsSubmitting(false);
     }

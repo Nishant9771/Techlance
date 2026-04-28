@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { RoleProvider, useRole } from '@/context/RoleContext';
@@ -144,7 +144,9 @@ export default function CatchAllPage() {
   return (
     <AuthProvider>
       <RoleProvider>
-        <RouteRenderer />
+        <Suspense fallback={null}>
+          <RouteRenderer />
+        </Suspense>
       </RoleProvider>
     </AuthProvider>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from '@/lib/router';
 import { motion, AnimatePresence } from 'motion/react';
+import { getSmartImage } from '@/utils/assetManager';
 import { 
   ArrowLeft, 
   CheckCircle2, 
@@ -182,7 +183,7 @@ export default function Workspace() {
             <div className="flex flex-wrap items-center gap-6 text-sm font-bold">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-slate-800 overflow-hidden border border-white/10">
-                  <img src={mockProject.actorAvatar} alt={mockProject.actorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={getSmartImage("projects")} alt={mockProject.actorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 <span className="text-slate-300">{mockProject.actorName}</span>
               </div>
@@ -230,7 +231,7 @@ export default function Workspace() {
             >
               <div className="p-4 md:p-6 border-b border-white/5 flex items-center gap-3 bg-[#030303] rounded-t-3xl">
                 <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden border border-white/10">
-                  <img src={mockProject.actorAvatar} alt={mockProject.actorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={getSmartImage("projects")} alt={mockProject.actorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-white">{mockProject.actorName}</h2>

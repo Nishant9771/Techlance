@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from '@/lib/router';
 import { useRole } from '../context/RoleContext';
 import { useAuth } from '@/context/AuthContext';
+import { getSmartImage } from '@/utils/assetManager';
 import { upsertUserProfile, type ProfileDetails, type SerializableProfileValue } from '@/lib/firebaseAuth';
 import { getBlockchainReputation } from '@/lib/blockchainClient';
 import { 
@@ -324,7 +325,7 @@ export default function Profile() {
               <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-br from-blue-500/20 to-purple-500/20" />
               
               <div className="relative w-32 h-32 mx-auto rounded-full bg-slate-800 border-4 border-slate-900 overflow-hidden shadow-xl mb-4 mt-4">
-                <img src={profile.avatar} alt={profile.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img src={getSmartImage("profiles")} alt={profile.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 {isEditing && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center cursor-pointer hover:bg-black/40 transition-colors">
                     <ImageIcon className="w-6 h-6 text-white" />
@@ -717,7 +718,7 @@ export default function Profile() {
                       {mockActivity.stories.map(story => (
                         <div key={story.id} className="flex-shrink-0 w-32 group cursor-pointer">
                           <div className="w-full aspect-[9/16] rounded-xl overflow-hidden relative mb-2 border border-white/10 group-hover:border-blue-500/50 transition-colors">
-                            <img src={story.img} alt={story.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" referrerPolicy="no-referrer" />
+                            <img src={getSmartImage("cuts")} alt={story.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" referrerPolicy="no-referrer" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                             <p className="absolute bottom-2 left-2 right-2 text-[10px] font-medium text-white leading-tight">{story.title}</p>
                           </div>

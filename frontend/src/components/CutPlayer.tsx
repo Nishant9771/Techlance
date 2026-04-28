@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getSmartImage, getSmartVideo } from '@/utils/assetManager';
 
 interface CutPlayerProps {
   story: any;
@@ -12,6 +13,7 @@ export const CutPlayer: React.FC<CutPlayerProps> = ({ story, onNext, isActive })
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [vidIndex, setVidIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -61,6 +63,13 @@ export const CutPlayer: React.FC<CutPlayerProps> = ({ story, onNext, isActive })
     return () => clearInterval(interval);
   }, [isActive, story, onNext]);
 
+  useEffect(() => {
+    const v = setInterval(() => {
+      setVidIndex((prev) => (prev + 1) % 5);
+    }, 10000);
+    return () => clearInterval(v);
+  }, []);
+
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -86,18 +95,19 @@ export const CutPlayer: React.FC<CutPlayerProps> = ({ story, onNext, isActive })
       {story.type === 'video' ? (
         <video 
           ref={videoRef}
-          src={story.url || "https://www.w3schools.com/html/mov_bbb.mp4"} 
+          src={getSmartVideo(vidIndex)} 
+          autoPlay
+          loop
           className="w-full h-full object-cover"
-          loop={false}
           muted={isMuted}
           playsInline
           poster={story.thumbnail}
         />
       ) : story.type === 'audio' ? (
         <div className="w-full h-full flex flex-col items-center justify-center relative">
-           <img src={story.thumbnail} alt="Audio Cover" className="absolute inset-0 w-full h-full object-cover opacity-30 blur-sm" />
+           <img src={getSmartImage("cuts")} alt="Audio Cover" className="absolute inset-0 w-full h-full object-cover opacity-30 blur-sm" />
            <div className="relative z-10 w-48 h-48 rounded-full overflow-hidden border-4 border-blue-500/50 flex flex-col items-center justify-center bg-slate-900 shadow-[0_0_50px_rgba(59,130,246,0.3)]">
-             <img src={story.thumbnail} alt="Audio Cover" className={`w-full h-full object-cover ${isPlaying ? 'animate-[spin_10s_linear_infinite]' : ''}`} />
+             <img src={getSmartImage("cuts")} alt="Audio Cover" className={`w-full h-full object-cover ${isPlaying ? 'animate-[spin_10s_linear_infinite]' : ''}`} />
              <audio ref={audioRef} src={story.audioUrl || "https://www.w3schools.com/html/horse.mp3"} muted={isMuted} />
            </div>
            <div className="relative z-10 mt-8 flex space-x-1">
@@ -112,7 +122,7 @@ export const CutPlayer: React.FC<CutPlayerProps> = ({ story, onNext, isActive })
            </div>
         </div>
       ) : (
-        <img src={story.thumbnail} alt={story.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        <img src={getSmartImage("cuts")} alt={story.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
       )}
 
       {/* Overlay Player Controls */}

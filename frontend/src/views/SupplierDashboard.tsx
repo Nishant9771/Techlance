@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from '@/lib/router';
+import { getSmartImage } from '@/utils/assetManager';
 import { TermsContent, PrivacyContent, HelpContent } from '../components/LegalContent';
 import { InteractionModal } from '../components/InteractionModal';
 import { CutPlayer } from '../components/CutPlayer';
@@ -307,7 +308,7 @@ export default function SupplierDashboard() {
                         className="px-3 py-2 hover:bg-white/5 rounded-xl cursor-pointer flex items-center gap-3"
                         onClick={() => navigate('/profile')}
                       >
-                        <div className="w-8 h-8 rounded-full bg-slate-800 overflow-hidden"><img src="https://picsum.photos/seed/s1/50/50" alt="User" /></div>
+                        <div className="w-8 h-8 rounded-full bg-slate-800 overflow-hidden"><img src={getSmartImage("profiles")} alt="User" /></div>
                         <div><p className="text-sm text-white">Alice Engineer</p><p className="text-xs text-slate-500">Hardware</p></div>
                       </div>
                       <div className="px-3 py-2 mt-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Projects</div>
@@ -389,7 +390,7 @@ export default function SupplierDashboard() {
               onClick={() => navigate('/profile')}
               className="w-10 h-10 rounded-full bg-slate-800 border-2 border-white/10 overflow-hidden hover:border-blue-500/50 transition-all"
             >
-              <img src="https://picsum.photos/seed/supplier/150/150" alt="Supplier" className="w-full h-full object-cover" />
+              <img src={getSmartImage("shop")} alt="Supplier" className="w-full h-full object-cover" />
             </button>
           </div>
         </header>
@@ -419,13 +420,13 @@ export default function SupplierDashboard() {
                           onClick={() => setActiveStory(story)}
                           className="relative w-64 h-40 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer group border border-white/5 hover:border-blue-500/30 transition-colors shadow-lg"
                         >
-                          <img src={story.thumbnail} alt={story.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" referrerPolicy="no-referrer" />
+                          <img src={getSmartImage("cuts")} alt={story.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent opacity-90" />
                           <div className="absolute bottom-4 left-4 right-4">
                             <p className="text-white text-sm font-bold truncate mb-1 shadow-sm">{story.title}</p>
                             <div className="flex items-center gap-2">
                               <div className="w-5 h-5 rounded-full overflow-hidden border border-white/20">
-                                <img src={`https://picsum.photos/seed/user${i}/50/50`} alt={story.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                <img src={getSmartImage("profiles")} alt={story.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                               </div>
                               <p className="text-slate-300 text-xs truncate font-medium">{story.name}</p>
                             </div>
@@ -468,7 +469,7 @@ export default function SupplierDashboard() {
                             <div className="flex justify-between items-start mb-4">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-white/10">
-                                  <img src={`https://picsum.photos/seed/author${post.id}/100/100`} alt={post.author} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  <img src={getSmartImage("profiles")} alt={post.author} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 </div>
                                 <div>
                                   <h4 className="text-sm font-semibold text-white">{post.author}</h4>
@@ -552,7 +553,7 @@ export default function SupplierDashboard() {
                   {/* SECTION 3: SUPPLIER PROFILE BLOCK */}
                   <div className="bg-slate-900/80 border border-white/10 rounded-3xl p-6 relative overflow-hidden flex flex-col md:flex-row gap-6 items-center md:items-start shadow-xl backdrop-blur-md">
                     <div className="w-24 h-24 rounded-2xl bg-slate-800 border-2 border-white/10 overflow-hidden shrink-0">
-                      <img src="https://picsum.photos/seed/supplier/150/150" alt="Supplier" className="w-full h-full object-cover" />
+                      <img src={getSmartImage("shop")} alt="Supplier" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 text-center md:text-left">
                       <h1 className="text-3xl font-bold text-white mb-2">Acme Supplies</h1>
@@ -590,7 +591,7 @@ export default function SupplierDashboard() {
                     className="bg-slate-900/60 border border-white/10 hover:border-blue-500/30 rounded-2xl overflow-hidden flex flex-col shadow-lg transition-all"
                   >
                     <div className="h-40 bg-slate-800 relative">
-                      <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                      <img src={getSmartImage("shop")} alt={product.name} className="w-full h-full object-cover" />
                       <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-md px-2 py-1 rounded-lg text-xs font-medium text-white border border-white/10">
                         {product.stock}
                       </div>
@@ -725,7 +726,7 @@ export default function SupplierDashboard() {
               <div className="flex-[3] bg-slate-900 border border-white/10 rounded-2xl p-6 flex flex-col shadow-2xl">
                 <div className="flex items-center gap-4 mb-6 pb-6 border-b border-white/10">
                   <div className="w-12 h-12 rounded-full border-2 border-blue-500 overflow-hidden">
-                    <img src={`https://picsum.photos/seed/user${activeStory.name}/100/100`} alt={activeStory.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={getSmartImage("profiles")} alt={activeStory.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                   <div>
                     <span className="text-white font-medium shadow-sm block text-lg">{activeStory.name}</span>

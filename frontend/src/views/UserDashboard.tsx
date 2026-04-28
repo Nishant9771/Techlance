@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from '@/lib/router';
+import { getSmartImage } from '@/utils/assetManager';
 import { TermsContent, PrivacyContent, HelpContent } from '../components/LegalContent';
 import { InteractionModal } from '../components/InteractionModal';
 import { CutPlayer } from '../components/CutPlayer';
@@ -48,6 +49,32 @@ import {
   supplierAds, 
   chatMessagesData 
 } from '../data/dummyData';
+
+const CUT_IMAGES = [
+  "/assets/images/cuts/cut1.jpg",
+  "/assets/images/cuts/cut2.jpg",
+  "/assets/images/cuts/cut3.jpg",
+  "/assets/images/cuts/cut4.jpg",
+  "/assets/images/cuts/cut5.jpg",
+  "/assets/images/cuts/cut6.jpg",
+  "/assets/images/cuts/cut7.jpg",
+  "/assets/images/cuts/cut8.jpg",
+  "/assets/images/cuts/cut9.jpg",
+  "/assets/images/cuts/cut10.jpg"
+];
+
+const PROFILE_IMAGES = [
+  "/assets/images/profiles/prof1.jpg",
+  "/assets/images/profiles/prof2.jpg",
+  "/assets/images/profiles/prof3.jpg",
+  "/assets/images/profiles/prof4.jpg",
+  "/assets/images/profiles/prof5.jpg",
+  "/assets/images/profiles/prof6.jpg",
+  "/assets/images/profiles/prof7.jpg",
+  "/assets/images/profiles/prof8.jpg",
+  "/assets/images/profiles/prof9.jpg",
+  "/assets/images/profiles/prof10.jpg"
+];
 
 // --- DUMMY DATA ---
 const suggestedActors = [
@@ -289,7 +316,7 @@ export default function UserDashboard() {
                         className="px-3 py-2 hover:bg-white/5 rounded-xl cursor-pointer flex items-center gap-3"
                         onClick={() => navigate('/profile')}
                       >
-                        <div className="w-8 h-8 rounded-full bg-slate-800 overflow-hidden"><img src="https://picsum.photos/seed/s1/50/50" alt="User" /></div>
+                        <div className="w-8 h-8 rounded-full bg-slate-800 overflow-hidden"><img src={PROFILE_IMAGES[1]} alt="User" /></div>
                         <div><p className="text-sm text-white">Alice Engineer</p><p className="text-xs text-slate-500">Hardware</p></div>
                       </div>
                       <div className="px-3 py-2 mt-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Projects</div>
@@ -412,13 +439,13 @@ export default function UserDashboard() {
                     onClick={() => setActiveStory(story)}
                     className="relative w-64 h-40 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer group border border-white/5 hover:border-blue-500/30 transition-colors shadow-lg"
                   >
-                    <img src={story.thumbnail} alt={story.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" referrerPolicy="no-referrer" />
+                    <img src={CUT_IMAGES[i % CUT_IMAGES.length]} alt={story.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" referrerPolicy="no-referrer" />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent opacity-90" />
                     <div className="absolute bottom-4 left-4 right-4">
                       <p className="text-white text-sm font-bold truncate mb-1 shadow-sm">{story.title}</p>
                       <div className="flex items-center gap-2">
                         <div className="w-5 h-5 rounded-full overflow-hidden border border-white/20">
-                          <img src={`https://picsum.photos/seed/user${i}/50/50`} alt={story.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={PROFILE_IMAGES[i % PROFILE_IMAGES.length]} alt={story.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         </div>
                         <p className="text-slate-300 text-xs truncate font-medium">{story.name}</p>
                       </div>
@@ -461,7 +488,7 @@ export default function UserDashboard() {
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-white/10">
-                            <img src={`https://picsum.photos/seed/author${post.id}/100/100`} alt={post.author} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <img src={PROFILE_IMAGES[i % PROFILE_IMAGES.length]} alt={post.author} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           </div>
                           <div>
                             <h4 className="text-sm font-semibold text-white">{post.author}</h4>
@@ -784,7 +811,7 @@ export default function UserDashboard() {
               <div className="flex-[3] bg-slate-900 border border-white/10 rounded-2xl p-6 flex flex-col shadow-2xl">
                 <div className="flex items-center gap-4 mb-6 pb-6 border-b border-white/10">
                   <div className="w-12 h-12 rounded-full border-2 border-blue-500 overflow-hidden">
-                    <img src={`https://picsum.photos/seed/user${activeStory.name}/100/100`} alt={activeStory.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={PROFILE_IMAGES[(activeStory?.name?.length || 0) % PROFILE_IMAGES.length]} alt={activeStory.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                   <div>
                     <span className="text-white font-medium shadow-sm block text-lg">{activeStory.name}</span>
@@ -947,7 +974,7 @@ export default function UserDashboard() {
                   <div key={i} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-white/5">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-full bg-slate-800 overflow-hidden">
-                        <img src={`https://picsum.photos/seed/actor${i}/100/100`} alt={actor.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img src={PROFILE_IMAGES[i % PROFILE_IMAGES.length]} alt={actor.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                       <div>
                         <p className="text-base font-medium text-white">{actor.name}</p>
@@ -980,7 +1007,7 @@ export default function UserDashboard() {
                 {sidebarDetailModal.type === 'suppliers' && sidebarDetailModal.data.map((ad: any, i: number) => (
                   <div key={i} className="flex gap-4 p-4 bg-slate-800/50 rounded-xl border border-white/5">
                     <div className="w-16 h-16 rounded-lg bg-slate-800 flex-shrink-0 overflow-hidden border border-white/5">
-                      <img src={`https://picsum.photos/seed/ad${i}/100/100`} alt="Ad" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={getSmartImage("ui")} alt="Ad" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>
                     <div className="flex-1">
                       <p className="text-base font-medium text-white mb-1">{ad.name}</p>
